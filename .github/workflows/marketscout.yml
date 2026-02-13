@@ -1,0 +1,36 @@
+name: MarketScout Telegram notifications
+
+on:
+  # Manual trigger from GitHub UI
+  workflow_dispatch:
+  # Scheduled times (GitHub uses UTC)
+  schedule:
+    - cron: "35 9 * * *"   # 09:35
+    - cron: "0 13 * * *"   # 13:00
+    - cron: "5 16 * * *"   # 16:05
+
+jobs:
+  run-screener:
+    runs-on: ubuntu-latest
+
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Run MarketScout screener
+        run: python run_screener.py
+
