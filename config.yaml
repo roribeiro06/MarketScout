@@ -1,0 +1,23 @@
+# Core thresholds (can be tweaked without changing code)
+thresholds:
+  one_day_pct_abs: 3.0      # abs(1-day % change) >= 3%
+  one_week_pct_abs: 5.0     # abs(1-week % change) >= 5%
+  one_month_pct_abs: 10.0   # abs(1-month % change) >= 10%
+  min_volume: 10000000      # >= 10M shares
+
+# Exchanges to scan
+exchanges:
+  - NYSE
+  - NASDAQ
+
+# Run profile: morning_scan | midday_scan | close_scan
+run_profile: morning_scan
+
+# Dry-run mode: when true, do not hit Telegram API, just log
+dry_run: true
+
+# Paths
+data_dir: data
+charts_dir: charts
+logs_dir: logs
+
