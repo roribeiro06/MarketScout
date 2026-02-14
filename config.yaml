@@ -4,20 +4,104 @@ thresholds:
   one_week_pct_abs: 5.0     # abs(1-week % change) >= 5%
   one_month_pct_abs: 10.0   # abs(1-month % change) >= 10%
   min_volume: 10000000      # >= 10M shares
+  min_price: 5.0            # >= $5 per share
 
 # Exchanges to scan
 exchanges:
   - NYSE
   - NASDAQ
 
+# Crypto to track (same % criteria: 1D +/-3%, 1W +/-5%, 1M +/-10%)
+crypto:
+  - symbol: BTC-USD
+    name: Bitcoin
+  - symbol: ETH-USD
+    name: Ethereum
+
+# Forex thresholds: 1D +/-0.5%, 1W +/-1%, 1M +/-3%
+forex_thresholds:
+  one_day_pct_abs: 0.5
+  one_week_pct_abs: 1.0
+  one_month_pct_abs: 3.0
+
+# Forex pairs to track
+forex:
+  - symbol: EURUSD=X
+    name: "Euro / US Dollar"
+  - symbol: GBPUSD=X
+    name: "British Pound / US Dollar"
+  - symbol: USDBRL=X
+    name: "US Dollar / Brazilian Real"
+  - symbol: USDJPY=X
+    name: "US Dollar / Japanese Yen"
+  - symbol: USDCNY=X
+    name: "US Dollar / Chinese Yuan"
+
+# Commodity futures: 1D +/-2%, 1W +/-5%, 1M +/-10%, min 100K contracts
+commodity_thresholds:
+  one_day_pct_abs: 2.0
+  one_week_pct_abs: 5.0
+  one_month_pct_abs: 10.0
+  min_volume_contracts: 100000
+
+# All commodity futures to track (Yahoo Finance =F symbols)
+commodities:
+  - symbol: CL=F
+    name: Crude Oil
+  - symbol: BZ=F
+    name: Brent Crude
+  - symbol: NG=F
+    name: Natural Gas
+  - symbol: RB=F
+    name: RBOB Gasoline
+  - symbol: HO=F
+    name: Heating Oil
+  - symbol: GC=F
+    name: Gold
+  - symbol: SI=F
+    name: Silver
+  - symbol: HG=F
+    name: Copper
+  - symbol: PL=F
+    name: Platinum
+  - symbol: PA=F
+    name: Palladium
+  - symbol: ZC=F
+    name: Corn
+  - symbol: ZS=F
+    name: Soybeans
+  - symbol: ZW=F
+    name: Wheat
+  - symbol: KE=F
+    name: KC HRW Wheat
+  - symbol: CT=F
+    name: Cotton
+  - symbol: CC=F
+    name: Cocoa
+  - symbol: KC=F
+    name: Coffee
+  - symbol: SB=F
+    name: Sugar
+  - symbol: OJ=F
+    name: Orange Juice
+  - symbol: ZO=F
+    name: Oats
+  - symbol: LE=F
+    name: Live Cattle
+  - symbol: HE=F
+    name: Lean Hogs
+  - symbol: LBS=F
+    name: Lumber
+
 # Run profile: morning_scan | midday_scan | close_scan
 run_profile: morning_scan
 
 # Dry-run mode: when true, do not hit Telegram API, just log
-dry_run: true
+dry_run: false
 
 # Paths
-data_dir: data
-charts_dir: charts
-logs_dir: logs
+paths:
+  data_dir: data
+  charts_dir: charts
+  logs_dir: logs
 

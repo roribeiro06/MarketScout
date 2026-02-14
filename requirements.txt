@@ -5,4 +5,5 @@ matplotlib>=3.9
 requests>=2.32
 python-dotenv>=1.0
 PyYAML>=6.0
+beautifulsoup4>=4.11
 
