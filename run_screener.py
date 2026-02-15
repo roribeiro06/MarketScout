@@ -1,7 +1,9 @@
 """Main entry point for MarketScout stock screener."""
 import html
 import os
+import requests
 from datetime import datetime
+from dotenv import load_dotenv
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 import yfinance as yf
