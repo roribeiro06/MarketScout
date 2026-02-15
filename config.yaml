@@ -93,6 +93,148 @@ commodities:
   - symbol: LBS=F
     name: Lumber
 
+# ETFs: 1D +/-3%, 1W +/-5%, 1M +/-10%, min volume 20M. Group by asset class.
+etf_thresholds:
+  one_day_pct_abs: 3.0
+  one_week_pct_abs: 5.0
+  one_month_pct_abs: 10.0
+  min_volume: 20000000
+
+# Order of asset classes for display
+etf_asset_class_order:
+  - Equity
+  - "Fixed Income"
+  - Commodities
+  - Currency
+  - "Asset Location"
+  - Alternatives
+
+# ETFs to track (symbol, name, asset_class)
+etfs:
+  # Equity
+  - symbol: SPY
+    name: SPDR S&P 500
+    asset_class: Equity
+  - symbol: QQQ
+    name: Invesco QQQ
+    asset_class: Equity
+  - symbol: IWM
+    name: iShares Russell 2000
+    asset_class: Equity
+  - symbol: VTI
+    name: Vanguard Total Stock Market
+    asset_class: Equity
+  - symbol: VOO
+    name: Vanguard S&P 500
+    asset_class: Equity
+  - symbol: DIA
+    name: SPDR Dow Jones Industrial Average
+    asset_class: Equity
+  - symbol: VTV
+    name: Vanguard Value
+    asset_class: Equity
+  - symbol: VUG
+    name: Vanguard Growth
+    asset_class: Equity
+  - symbol: SCHX
+    name: Schwab US Large-Cap
+    asset_class: Equity
+  - symbol: RSP
+    name: Invesco S&P 500 Equal Weight
+    asset_class: Equity
+  # Fixed Income
+  - symbol: BND
+    name: Vanguard Total Bond
+    asset_class: "Fixed Income"
+  - symbol: AGG
+    name: iShares Core US Aggregate Bond
+    asset_class: "Fixed Income"
+  - symbol: TLT
+    name: iShares 20+ Year Treasury
+    asset_class: "Fixed Income"
+  - symbol: LQD
+    name: iShares Investment Grade Corporate Bond
+    asset_class: "Fixed Income"
+  - symbol: HYG
+    name: iShares iBoxx High Yield Corporate Bond
+    asset_class: "Fixed Income"
+  - symbol: SHY
+    name: iShares 1-3 Year Treasury
+    asset_class: "Fixed Income"
+  - symbol: TIP
+    name: iShares TIPS Bond
+    asset_class: "Fixed Income"
+  - symbol: BNDX
+    name: Vanguard Total International Bond
+    asset_class: "Fixed Income"
+  # Commodities
+  - symbol: GLD
+    name: SPDR Gold Shares
+    asset_class: Commodities
+  - symbol: SLV
+    name: iShares Silver Trust
+    asset_class: Commodities
+  - symbol: USO
+    name: United States Oil
+    asset_class: Commodities
+  - symbol: IAU
+    name: iShares Gold Trust
+    asset_class: Commodities
+  - symbol: DBA
+    name: Invesco DB Agriculture
+    asset_class: Commodities
+  - symbol: DBB
+    name: Invesco DB Base Metals
+    asset_class: Commodities
+  # Currency
+  - symbol: UUP
+    name: Invesco DB US Dollar Index
+    asset_class: Currency
+  - symbol: FXE
+    name: Invesco Euro Currency
+    asset_class: Currency
+  - symbol: FXY
+    name: Invesco Japanese Yen
+    asset_class: Currency
+  - symbol: UDN
+    name: Invesco DB US Dollar Index Bearish
+    asset_class: Currency
+  # Asset Location (International / Global)
+  - symbol: EFA
+    name: iShares MSCI EAFE
+    asset_class: "Asset Location"
+  - symbol: VXUS
+    name: Vanguard Total International Stock
+    asset_class: "Asset Location"
+  - symbol: IEMG
+    name: iShares Core MSCI Emerging Markets
+    asset_class: "Asset Location"
+  - symbol: VEA
+    name: Vanguard Developed Markets
+    asset_class: "Asset Location"
+  - symbol: IEFA
+    name: iShares Core MSCI EAFE
+    asset_class: "Asset Location"
+  - symbol: EEM
+    name: iShares MSCI Emerging Markets
+    asset_class: "Asset Location"
+  # Alternatives
+  - symbol: VNQ
+    name: Vanguard Real Estate
+    asset_class: Alternatives
+  - symbol: VNQI
+    name: Vanguard Global ex-US Real Estate
+    asset_class: Alternatives
+  - symbol: VGLT
+    name: Vanguard Long-Term Treasury
+    asset_class: Alternatives
+  - symbol: BITO
+    name: ProShares Bitcoin Strategy
+    asset_class: Alternatives
+  - symbol: VXX
+    name: iPath Series B S&P 500 VIX Short-Term Futures
+    asset_class: Alternatives
+
 # Run profile: morning_scan | midday_scan | close_scan
 run_profile: morning_scan
 

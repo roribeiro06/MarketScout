@@ -158,16 +158,18 @@ def screen_stock(symbol: str, config: Dict) -> Optional[Dict]:
     """
     thresholds = config["thresholds"]
     
-    # Fetch data (6mo so we have 6-month % for reference)
-    data = fetch_stock_data(symbol, period="6mo")
+    # Fetch data (5y so we have 6M/1Y/3Y % for reference)
+    data = fetch_stock_data(symbol, period="5y")
     if data is None or len(data) < 5:  # Reduced minimum days requirement
         return None
     
-    # Calculate changes (use available days, not fixed)
+    # Calculate changes (use available days, not fixed). 126/252/756 ≈ 6M/1Y/3Y trading days
     one_day_change = calculate_percent_change(data, 1)
     one_week_change = calculate_percent_change(data, min(5, len(data) - 1))
     one_month_change = calculate_percent_change(data, min(20, len(data) - 1))
     one_6m_change = calculate_percent_change(data, min(126, len(data) - 1))
+    one_year_change = calculate_percent_change(data, min(252, len(data) - 1))
+    three_year_change = calculate_percent_change(data, min(756, len(data) - 1))
     
     # Allow None for month if we don't have enough data, but require day and week
     if one_day_change is None or one_week_change is None:
@@ -212,6 +214,8 @@ def screen_stock(symbol: str, config: Dict) -> Optional[Dict]:
             "one_week_pct": round(one_week_change, 2),
             "one_month_pct": round(one_month_change, 2) if one_month_change is not None else None,
             "one_6m_pct": round(one_6m_change, 2) if one_6m_change is not None else None,
+            "one_year_pct": round(one_year_change, 2) if one_year_change is not None else None,
+            "three_year_pct": round(three_year_change, 2) if three_year_change is not None else None,
             "passes_day": passes_day,
             "passes_week": passes_week,
             "passes_month": passes_month,
@@ -256,7 +260,7 @@ def screen_crypto(symbol: str, name: str, config: Dict) -> Optional[Dict]:
     """
     thresholds = config["thresholds"]
     
-    data = fetch_stock_data(symbol, period="6mo")
+    data = fetch_stock_data(symbol, period="5y")
     if data is None or len(data) < 5:
         return None
     
@@ -264,6 +268,8 @@ def screen_crypto(symbol: str, name: str, config: Dict) -> Optional[Dict]:
     one_week_change = calculate_percent_change(data, min(5, len(data) - 1))
     one_month_change = calculate_percent_change(data, min(20, len(data) - 1))
     one_6m_change = calculate_percent_change(data, min(126, len(data) - 1))
+    one_year_change = calculate_percent_change(data, min(252, len(data) - 1))
+    three_year_change = calculate_percent_change(data, min(756, len(data) - 1))
     
     if one_day_change is None or one_week_change is None:
         return None
@@ -288,6 +294,8 @@ def screen_crypto(symbol: str, name: str, config: Dict) -> Optional[Dict]:
         "one_week_pct": round(one_week_change, 2),
         "one_month_pct": round(one_month_change, 2) if one_month_change is not None else None,
         "one_6m_pct": round(one_6m_change, 2) if one_6m_change is not None else None,
+        "one_year_pct": round(one_year_change, 2) if one_year_change is not None else None,
+        "three_year_pct": round(three_year_change, 2) if three_year_change is not None else None,
         "passes_day": passes_day,
         "passes_week": passes_week,
         "passes_month": passes_month,
@@ -328,7 +336,7 @@ def screen_forex(symbol: str, name: str, config: Dict) -> Optional[Dict]:
         "one_month_pct_abs": 3.0,
     }
     
-    data = fetch_stock_data(symbol, period="6mo")
+    data = fetch_stock_data(symbol, period="5y")
     if data is None or len(data) < 5:
         return None
     
@@ -336,6 +344,8 @@ def screen_forex(symbol: str, name: str, config: Dict) -> Optional[Dict]:
     one_week_change = calculate_percent_change(data, min(5, len(data) - 1))
     one_month_change = calculate_percent_change(data, min(20, len(data) - 1))
     one_6m_change = calculate_percent_change(data, min(126, len(data) - 1))
+    one_year_change = calculate_percent_change(data, min(252, len(data) - 1))
+    three_year_change = calculate_percent_change(data, min(756, len(data) - 1))
     
     if one_day_change is None or one_week_change is None:
         return None
@@ -360,6 +370,8 @@ def screen_forex(symbol: str, name: str, config: Dict) -> Optional[Dict]:
         "one_week_pct": round(one_week_change, 2),
         "one_month_pct": round(one_month_change, 2) if one_month_change is not None else None,
         "one_6m_pct": round(one_6m_change, 2) if one_6m_change is not None else None,
+        "one_year_pct": round(one_year_change, 2) if one_year_change is not None else None,
+        "three_year_pct": round(three_year_change, 2) if three_year_change is not None else None,
         "passes_day": passes_day,
         "passes_week": passes_week,
         "passes_month": passes_month,
@@ -401,7 +413,7 @@ def screen_commodity(symbol: str, name: str, config: Dict) -> Optional[Dict]:
         "min_volume_contracts": 100000,
     }
     
-    data = fetch_stock_data(symbol, period="6mo")
+    data = fetch_stock_data(symbol, period="5y")
     if data is None or len(data) < 5:
         return None
     
@@ -409,6 +421,8 @@ def screen_commodity(symbol: str, name: str, config: Dict) -> Optional[Dict]:
     one_week_change = calculate_percent_change(data, min(5, len(data) - 1))
     one_month_change = calculate_percent_change(data, min(20, len(data) - 1))
     one_6m_change = calculate_percent_change(data, min(126, len(data) - 1))
+    one_year_change = calculate_percent_change(data, min(252, len(data) - 1))
+    three_year_change = calculate_percent_change(data, min(756, len(data) - 1))
     
     if one_day_change is None or one_week_change is None:
         return None
@@ -434,6 +448,8 @@ def screen_commodity(symbol: str, name: str, config: Dict) -> Optional[Dict]:
         "one_week_pct": round(one_week_change, 2),
         "one_month_pct": round(one_month_change, 2) if one_month_change is not None else None,
         "one_6m_pct": round(one_6m_change, 2) if one_6m_change is not None else None,
+        "one_year_pct": round(one_year_change, 2) if one_year_change is not None else None,
+        "three_year_pct": round(three_year_change, 2) if three_year_change is not None else None,
         "passes_day": passes_day,
         "passes_week": passes_week,
         "passes_month": passes_month,
@@ -459,5 +475,89 @@ def run_commodity_screener(config: Dict) -> List[Dict]:
         if r:
             results.append(r)
             print(f"  [COMMODITY] {symbol}: {r['one_day_pct']:.2f}% (1D), vol {r['volume']:,}")
+    
+    return results
+
+
+def screen_etf(symbol: str, name: str, asset_class: str, config: Dict) -> Optional[Dict]:
+    """
+    Screen a single ETF: 1D +/-3%, 1W +/-5%, 1M +/-10%, min volume 20M.
+    Returns dict if it passes, None otherwise.
+    """
+    thresholds = config.get("etf_thresholds") or {
+        "one_day_pct_abs": 3.0,
+        "one_week_pct_abs": 5.0,
+        "one_month_pct_abs": 10.0,
+        "min_volume": 20_000_000,
+    }
+    
+    data = fetch_stock_data(symbol, period="5y")
+    if data is None or len(data) < 5:
+        return None
+    
+    one_day_change = calculate_percent_change(data, 1)
+    one_week_change = calculate_percent_change(data, min(5, len(data) - 1))
+    one_month_change = calculate_percent_change(data, min(20, len(data) - 1))
+    one_6m_change = calculate_percent_change(data, min(126, len(data) - 1))
+    one_year_change = calculate_percent_change(data, min(252, len(data) - 1))
+    three_year_change = calculate_percent_change(data, min(756, len(data) - 1))
+    
+    if one_day_change is None or one_week_change is None:
+        return None
+    
+    current_price = data["Close"].iloc[-1]
+    current_volume = int(data["Volume"].iloc[-1]) if "Volume" in data.columns else 0
+    
+    passes_day = abs(one_day_change) >= thresholds["one_day_pct_abs"]
+    passes_week = abs(one_week_change) >= thresholds["one_week_pct_abs"]
+    passes_month = one_month_change is not None and abs(one_month_change) >= thresholds["one_month_pct_abs"]
+    passes_volume = current_volume >= thresholds.get("min_volume", 20_000_000)
+    
+    if not (passes_volume and (passes_day or passes_week or passes_month)):
+        return None
+    
+    return {
+        "symbol": symbol,
+        "company_name": name,
+        "sector": "ETFs",
+        "asset_class": asset_class,
+        "price": round(current_price, 2),
+        "volume": current_volume,
+        "one_day_pct": round(one_day_change, 2),
+        "one_week_pct": round(one_week_change, 2),
+        "one_month_pct": round(one_month_change, 2) if one_month_change is not None else None,
+        "one_6m_pct": round(one_6m_change, 2) if one_6m_change is not None else None,
+        "one_year_pct": round(one_year_change, 2) if one_year_change is not None else None,
+        "three_year_pct": round(three_year_change, 2) if three_year_change is not None else None,
+        "passes_day": passes_day,
+        "passes_week": passes_week,
+        "passes_month": passes_month,
+        "data": data,
+    }
+
+
+def run_etf_screener(config: Dict) -> List[Dict]:
+    """Run the ETF screener. Returns only those meeting criteria (1D/1W/1M % and vol >= 20M)."""
+    results = []
+    etf_list = config.get("etfs") or []
+    order = config.get("etf_asset_class_order") or [
+        "Equity", "Fixed Income", "Commodities", "Currency", "Asset Location", "Alternatives"
+    ]
+    
+    for item in etf_list:
+        if isinstance(item, dict):
+            symbol = item.get("symbol")
+            name = item.get("name") or symbol
+            asset_class = item.get("asset_class", "Other")
+        else:
+            symbol = item
+            name = symbol
+            asset_class = "Other"
+        if not symbol:
+            continue
+        r = screen_etf(symbol, name, asset_class, config)
+        if r:
+            results.append(r)
+            print(f"  [ETF] {symbol}: {r['one_day_pct']:.2f}% (1D), vol {r['volume']/1e6:.1f}M")
     
     return results
