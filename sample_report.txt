@@ -1,0 +1,178 @@
+📊 <b>MarketScout Scan</b>
+Found 28 stock(s) + 2 ETF(s) + 2 crypto + 1 forex + 1 commodities matching criteria:
+
+<b>🌍 Indices</b>
+<b>S&P 500 (^GSPC)</b> 6836.17
+  1D: +0.05% | 1W: -1.39% | 1M: -1.56% | 6M: +5.68%
+
+<b>Nasdaq (^IXIC)</b> 22546.67
+  1D: -0.22% | 1W: -2.10% | 1M: -4.18% | 6M: +3.85%
+
+<b>Dow 30 (^DJI)</b> 49500.93
+  1D: +0.10% | 1W: -1.23% | 1M: +0.12% | 6M: +10.22%
+
+<b>Russell 2000 (^RUT)</b> 2646.70
+  1D: +1.18% | 1W: -0.89% | 1M: -1.04% | 6M: +15.12%
+
+<b>VIX (^VIX)</b> 20.60  1D: -1.06% | 6M: +38.91%
+
+
+<b>📈 Stocks</b>
+  <b>▸ Communication Services</b>
+<b>Alphabet Inc. (GOOGL)</b> $305.72
+  1D: -1.06% | <b>1W: -5.31%</b> | 1M: -8.13% | 6M: +50.88%
+  Vol: 38.47M ($11759.5M)
+
+<b>Comcast Corporation (CMCSA)</b> $31.57
+  1D: -0.79% | 1W: +0.64% | <b>1M: +11.36%</b> | 6M: +4.69%
+  Vol: 28.49M ($899.3M)
+
+<b>Nebius Group N.V. (NBIS)</b> $98.01
+  <b>1D: +9.23%</b> | <b>1W: +13.83%</b> | 1M: -5.66% | 6M: +43.16%
+  Vol: 20.50M ($2009.0M)
+
+<b>Netflix, Inc. (NFLX)</b> $76.87
+  1D: +1.33% | <b>1W: -6.48%</b> | <b>1M: -12.70%</b> | 6M: -37.53%
+  Vol: 42.23M ($3246.1M)
+
+
+  <b>▸ Consumer Cyclical</b>
+<b>Amazon.com, Inc. (AMZN)</b> $198.79
+  1D: -0.41% | <b>1W: -5.48%</b> | <b>1M: -16.54%</b> | 6M: -13.94%
+  Vol: 66.22M ($13163.0M)
+
+<b>NIKE, Inc. (NKE)</b> $63.13
+  <b>1D: +3.32%</b> | 1W: -1.24% | 1M: -2.26% | 6M: -16.40%
+  Vol: 20.18M ($1273.8M)
+
+<b>Rivian Automotive, Inc. (RIVN)</b> $17.73
+  <b>1D: +26.64%</b> | <b>1W: +19.80%</b> | 1M: +3.93% | 6M: +47.01%
+  Vol: 127.68M ($2263.7M)
+
+
+  <b>▸ Consumer Defensive</b>
+<b>The Coca-Cola Company (KO)</b> $78.68
+  1D: -0.41% | 1W: -0.44% | <b>1M: +11.63%</b> | 6M: +14.80%
+  Vol: 16.71M ($1314.8M)
+
+<b>The Procter & Gamble Company (PG)</b> $160.07
+  1D: -0.71% | 1W: +0.57% | <b>1M: +11.46%</b> | 6M: +5.59%
+  Vol: 14.00M ($2240.8M)
+
+<b>Walmart Inc. (WMT)</b> $133.89
+  1D: +0.19% | 1W: +2.07% | <b>1M: +12.32%</b> | 6M: +33.34%
+  Vol: 24.12M ($3230.0M)
+
+
+  <b>▸ Energy</b>
+<b>Exxon Mobil Corporation (XOM)</b> $148.45
+  1D: -0.99% | 1W: +0.26% | <b>1M: +15.73%</b> | 6M: +41.69%
+  Vol: 20.15M ($2992.0M)
+
+
+  <b>▸ Financial Services</b>
+<b>Affirm Holdings, Inc. (AFRM)</b> $49.81
+  1D: +0.10% | <b>1W: -12.66%</b> | <b>1M: -30.64%</b> | 6M: -35.33%
+  Vol: 10.25M ($510.6M)
+
+<b>Bank of America Corporation (BAC)</b> $52.55
+  1D: +0.06% | <b>1W: -7.04%</b> | 1M: -0.08% | 6M: +11.33%
+  Vol: 31.77M ($1669.5M)
+
+<b>Coinbase Global, Inc. (COIN)</b> $164.32
+  <b>1D: +16.46%</b> | 1W: -0.48% | <b>1M: -31.33%</b> | 6M: -49.42%
+  Vol: 32.35M ($5315.7M)
+
+<b>Robinhood Markets, Inc. (HOOD)</b> $75.97
+  <b>1D: +6.82%</b> | <b>1W: -8.27%</b> | <b>1M: -31.16%</b> | 6M: -31.38%
+  Vol: 43.42M ($3298.5M)
+
+<b>SoFi Technologies, Inc. (SOFI)</b> $19.61
+  1D: +1.61% | <b>1W: -5.99%</b> | <b>1M: -25.83%</b> | 6M: -15.80%
+  Vol: 43.00M ($843.2M)
+
+<b>Visa Inc. (V)</b> $314.08
+  <b>1D: -3.12%</b> | <b>1W: -5.08%</b> | 1M: -3.97% | 6M: -8.72%
+  Vol: 11.65M ($3659.2M)
+
+
+  <b>▸ Healthcare</b>
+<b>Johnson & Johnson (JNJ)</b> $243.45
+  1D: -0.45% | 1W: +1.44% | <b>1M: +10.88%</b> | 6M: +41.25%
+  Vol: 13.27M ($3229.4M)
+
+<b>UnitedHealth Group Incorporated (UNH)</b> $293.19
+  <b>1D: +3.10%</b> | <b>1W: +5.98%</b> | <b>1M: -13.50%</b> | 6M: +9.40%
+  Vol: 10.27M ($3010.4M)
+
+
+  <b>▸ Technology</b>
+<b>Apple Inc. (AAPL)</b> $255.78
+  1D: -2.27% | <b>1W: -7.95%</b> | 1M: -0.85% | 6M: +10.09%
+  Vol: 56.23M ($14382.5M)
+
+<b>Cisco Systems, Inc. (CSCO)</b> $76.85
+  1D: +2.47% | <b>1W: -9.40%</b> | 1M: +2.13% | 6M: +12.16%
+  Vol: 42.87M ($3294.8M)
+
+<b>Cognizant Technology Solutions Corporation (CTSH)</b> $66.55
+  1D: +1.09% | <b>1W: -13.66%</b> | <b>1M: -21.54%</b> | 6M: -3.22%
+  Vol: 13.05M ($868.8M)
+
+<b>CoreWeave, Inc. (CRWV)</b> $96.04
+  1D: +0.36% | <b>1W: +6.77%</b> | 1M: +1.08% | 6M: -3.48%
+  Vol: 23.10M ($2218.6M)
+
+<b>Intel Corporation (INTC)</b> $46.79
+  1D: +0.67% | <b>1W: -7.51%</b> | 1M: -3.17% | 6M: +96.10%
+  Vol: 69.58M ($3255.8M)
+
+<b>Microsoft Corporation (MSFT)</b> $401.32
+  1D: -0.13% | 1W: +0.04% | <b>1M: -12.12%</b> | 6M: -22.92%
+  Vol: 34.04M ($13661.4M)
+
+<b>Palantir Technologies Inc. (PLTR)</b> $131.41
+  1D: +1.77% | 1W: -3.30% | <b>1M: -25.79%</b> | 6M: -27.41%
+  Vol: 49.31M ($6480.4M)
+
+<b>QUALCOMM Incorporated (QCOM)</b> $140.70
+  1D: +1.61% | 1W: +2.45% | <b>1M: -12.82%</b> | 6M: -10.04%
+  Vol: 13.13M ($1847.8M)
+
+<b>Toast, Inc. (TOST)</b> $27.33
+  <b>1D: +4.55%</b> | 1W: -1.44% | <b>1M: -19.05%</b> | 6M: -36.44%
+  Vol: 33.95M ($927.8M)
+
+
+<b>🪙 Crypto</b>
+<b>Bitcoin (BTC-USD)</b> $69668.46
+  1D: +1.18% | 1W: -0.65% | <b>1M: -19.53%</b> | 6M: -37.13%
+  Vol: 37145.91M ($2587898435.3M)
+
+<b>Ethereum (ETH-USD)</b> $2078.66
+  1D: +1.47% | 1W: -1.18% | <b>1M: -26.18%</b> | 6M: -44.58%
+  Vol: 17039.89M ($35420145.0M)
+
+
+<b>🌾 Commodities</b>
+<b>Natural Gas (NG=F)</b> $3.24
+  1D: +0.81% | <b>1W: -5.23%</b> | 1M: +3.68% | 6M: +14.15%
+  Vol: 222.3K contracts ($7201.2M)
+
+
+<b>💵 Forex</b>
+<b>US Dollar / Japanese Yen (USDJPY=X)</b> 152.8210
+  1D: -0.29% | <b>1W: -2.53%</b> | <b>1M: -3.64%</b> | 6M: +3.32%
+
+
+<b>⚖️ ETFs</b>
+  <b>▸ Commodities</b>
+<b>iShares Silver Trust (SLV)</b> $69.72
+  1D: +2.94% | 1W: -0.67% | <b>1M: -16.32%</b> | 6M: +102.09%
+  Vol: 69.39M ($4837.7M)
+
+
+  <b>▸ Alternatives</b>
+<b>ProShares Bitcoin Strategy (BITO)</b> $9.50
+  <b>1D: +5.09%</b> | 1W: -1.96% | <b>1M: -28.02%</b> | 6M: -43.06%
+  Vol: 68.75M ($653.1M)
