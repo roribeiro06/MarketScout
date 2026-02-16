@@ -589,10 +589,14 @@ def main() -> None:
             send_telegram_message(message2, token, chat_id)
         print(f"\nTelegram notification sent (2 messages): {len(results)} stock(s), {etf_count} ETF(s), {crypto_count} crypto, {forex_count} forex, {commodity_count} commodities")
         
-        # Generate and send charts as media group (stocks + crypto that passed)
-        if all_results:
+        # Generate and send charts only for assets that pass at least 2 of 3 criteria (1D, 1W, 1M)
+        results_for_charts = [
+            r for r in all_results
+            if (r.get("passes_day", False) + r.get("passes_week", False) + r.get("passes_month", False)) >= 2
+        ]
+        if results_for_charts:
             print("Generating charts...")
-            charts = generate_charts_for_results(all_results, config)
+            charts = generate_charts_for_results(results_for_charts, config)
             
             if charts:
                 chart_paths = [chart_info["chart_path"] for chart_info in charts]
