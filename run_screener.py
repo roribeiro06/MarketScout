@@ -226,6 +226,33 @@ def send_telegram_media_group(photo_paths: list, token: str, chat_id: str) -> No
                 f.close()
 
 
+def _pct_sort_key(item: dict) -> tuple:
+    """Sort key: biggest price change first by magnitude (abs %), regardless of sign."""
+    d = item.get("one_day_pct")
+    w = item.get("one_week_pct")
+    m = item.get("one_month_pct")
+    vals = [abs(v) for v in (d, w, m) if v is not None]
+    max_abs = max(vals) if vals else 0.0
+    return (-max_abs,)  # descending: largest move first
+
+
+def _pct_str_no_pct(label: str, pct: Optional[float], passes: bool) -> str:
+    """Format percentage without '%' for Telegram. Bold if passes threshold."""
+    if pct is None:
+        return f"{label}: —"
+    s = f"{label}: {pct:+.2f}"
+    return f"<b>{s}</b>" if passes else s
+
+
+def _all_three_pass(item: dict) -> bool:
+    """True if asset passes 1D, 1W, and 1M criteria."""
+    return bool(
+        item.get("passes_day")
+        and item.get("passes_week")
+        and item.get("passes_month")
+    )
+
+
 def _append_section_block(
     message: str,
     by_sector: dict,
@@ -238,7 +265,7 @@ def _append_section_block(
     stocks = by_sector.get(sector, [])
     if not stocks:
         return message
-    stocks = sorted(stocks, key=lambda x: x.get("company_name", x["symbol"]).upper())
+    stocks = sorted(stocks, key=_pct_sort_key)
     message += f"<b>{emoji} {sector}</b>\n"
     for stock in stocks:
         symbol = stock["symbol"]
@@ -247,29 +274,26 @@ def _append_section_block(
         vol = stock.get("volume") or 0
         vol_shares = vol / 1_000_000
         dollar_vol = (vol * price) / 1_000_000
+        lead = "🟢 " if _all_three_pass(stock) else ""
 
-        def pct_str(label: str, pct: Optional[float], passes: bool) -> str:
-            if pct is None:
-                return f"{label}: —"
-            s = f"{label}: {pct:+.2f}%"
-            return f"<b>{s}</b>" if passes else s
-
-        d_str = pct_str("1D", stock["one_day_pct"], stock["passes_day"])
-        w_str = pct_str("1W", stock["one_week_pct"], stock["passes_week"])
+        d_str = _pct_str_no_pct("1D", stock["one_day_pct"], stock["passes_day"])
+        w_str = _pct_str_no_pct("1W", stock["one_week_pct"], stock["passes_week"])
         m_val = stock.get("one_month_pct")
         m_pass = stock.get("passes_month", False)
-        m_str = pct_str("1M", m_val, m_pass)
+        m_str = _pct_str_no_pct("1M", m_val, m_pass)
         six_val = stock.get("one_6m_pct")
         one_yr_val = stock.get("one_year_pct")
         three_yr_val = stock.get("three_year_pct")
-        six_str = f"6M: {six_val:+.2f}%" if six_val is not None else "6M: —"
-        one_yr_str = f"1Y: {one_yr_val:+.2f}%" if one_yr_val is not None else "1Y: —"
-        three_yr_str = f"3Y: {three_yr_val:+.2f}%" if three_yr_val is not None else "3Y: —"
+        six_str = f"6M: {six_val:+.2f}" if six_val is not None else "6M: —"
+        one_yr_str = f"1Y: {one_yr_val:+.2f}" if one_yr_val is not None else "1Y: —"
+        three_yr_str = f"3Y: {three_yr_val:+.2f}" if three_yr_val is not None else "3Y: —"
         change_str = f"{d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str} | {three_yr_str}"
+        sector_label = stock.get("sector", sector)
         if is_forex:
-            message += f"<b>{html.escape(company_name)} ({symbol})</b> {price:.4f}\n"
+            message += f"{lead}<b>{html.escape(company_name)} ({symbol})</b> {price:.4f}\n"
         else:
-            message += f"<b>{html.escape(company_name)} ({symbol})</b> ${price:.2f}\n"
+            message += f"{lead}<b>{html.escape(company_name)} ({symbol})</b> ${price:.2f}\n"
+        message += f"  <i>{sector_label}</i>\n"
         message += f"  {change_str}\n"
         if is_forex and vol > 0:
             message += f"  Vol: {vol_shares:.2f}M\n\n"
@@ -339,7 +363,7 @@ def format_stock_message(
             price = idx["price"]
             if idx.get("is_vix"):
                 d = idx.get("one_day_pct")
-                change = f"  1D: {d:+.2f}%" if d is not None else ""
+                change = f"  1D: {d:+.2f}" if d is not None else ""
                 msg1 += f"<b>{html.escape(name)} ({symbol})</b> {price:.2f}{change}\n\n"
             else:
                 d = idx.get("one_day_pct")
@@ -348,53 +372,51 @@ def format_stock_message(
                 six = idx.get("one_6m_pct")
                 one_yr = idx.get("one_year_pct")
                 three_yr = idx.get("three_year_pct")
-                d_str = f"1D: {d:+.2f}%" if d is not None else "1D: —"
-                w_str = f"1W: {w:+.2f}%" if w is not None else "1W: —"
-                m_str = f"1M: {m:+.2f}%" if m is not None else "1M: —"
-                six_str = f"6M: {six:+.2f}%" if six is not None else "6M: —"
-                one_yr_str = f"1Y: {one_yr:+.2f}%" if one_yr is not None else "1Y: —"
-                three_yr_str = f"3Y: {three_yr:+.2f}%" if three_yr is not None else "3Y: —"
+                d_str = f"1D: {d:+.2f}" if d is not None else "1D: —"
+                w_str = f"1W: {w:+.2f}" if w is not None else "1W: —"
+                m_str = f"1M: {m:+.2f}" if m is not None else "1M: —"
+                six_str = f"6M: {six:+.2f}" if six is not None else "6M: —"
+                one_yr_str = f"1Y: {one_yr:+.2f}" if one_yr is not None else "1Y: —"
+                three_yr_str = f"3Y: {three_yr:+.2f}" if three_yr is not None else "3Y: —"
                 msg1 += f"<b>{html.escape(name)} ({symbol})</b> {price:.2f}\n"
                 msg1 += f"  {d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str} | {three_yr_str}\n\n"
         msg1 += "\n"
 
     if stock_sectors:
         msg1 += "<b>📈 Stocks</b>\n"
+        all_stocks = []
         for sector in stock_sectors:
-            stocks = by_sector[sector]
-            stocks = sorted(stocks, key=lambda x: x.get("company_name", x["symbol"]).upper())
-            msg1 += f"  <b>▸ {sector}</b>\n"
-            for stock in stocks:
-                symbol = stock["symbol"]
-                company_name = stock.get("company_name", symbol)
-                price = stock["price"]
-                vol = stock.get("volume") or 0
-                vol_shares = vol / 1_000_000
-                dollar_vol = (vol * price) / 1_000_000
-                def pct_str(label: str, pct: Optional[float], passes: bool) -> str:
-                    if pct is None:
-                        return f"{label}: —"
-                    s = f"{label}: {pct:+.2f}%"
-                    return f"<b>{s}</b>" if passes else s
-                d_str = pct_str("1D", stock["one_day_pct"], stock["passes_day"])
-                w_str = pct_str("1W", stock["one_week_pct"], stock["passes_week"])
-                m_val = stock.get("one_month_pct")
-                m_pass = stock.get("passes_month", False)
-                m_str = pct_str("1M", m_val, m_pass)
-                six_val = stock.get("one_6m_pct")
-                one_yr_val = stock.get("one_year_pct")
-                three_yr_val = stock.get("three_year_pct")
-                six_str = f"6M: {six_val:+.2f}%" if six_val is not None else "6M: —"
-                one_yr_str = f"1Y: {one_yr_val:+.2f}%" if one_yr_val is not None else "1Y: —"
-                three_yr_str = f"3Y: {three_yr_val:+.2f}%" if three_yr_val is not None else "3Y: —"
-                change_str = f"{d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str} | {three_yr_str}"
-                msg1 += f"<b>{html.escape(company_name)} ({symbol})</b> ${price:.2f}\n"
-                msg1 += f"  {change_str}\n"
-                if vol > 0:
-                    msg1 += f"  Vol: {vol_shares:.2f}M (${dollar_vol:.1f}M)\n\n"
-                else:
-                    msg1 += "\n"
-            msg1 += "\n"
+            all_stocks.extend(by_sector[sector])
+        all_stocks.sort(key=_pct_sort_key)
+        for stock in all_stocks:
+            symbol = stock["symbol"]
+            company_name = stock.get("company_name", symbol)
+            sector_name = stock.get("sector", "Other")
+            price = stock["price"]
+            vol = stock.get("volume") or 0
+            vol_shares = vol / 1_000_000
+            dollar_vol = (vol * price) / 1_000_000
+            lead = "🟢 " if _all_three_pass(stock) else ""
+            d_str = _pct_str_no_pct("1D", stock["one_day_pct"], stock["passes_day"])
+            w_str = _pct_str_no_pct("1W", stock["one_week_pct"], stock["passes_week"])
+            m_val = stock.get("one_month_pct")
+            m_pass = stock.get("passes_month", False)
+            m_str = _pct_str_no_pct("1M", m_val, m_pass)
+            six_val = stock.get("one_6m_pct")
+            one_yr_val = stock.get("one_year_pct")
+            three_yr_val = stock.get("three_year_pct")
+            six_str = f"6M: {six_val:+.2f}" if six_val is not None else "6M: —"
+            one_yr_str = f"1Y: {one_yr_val:+.2f}" if one_yr_val is not None else "1Y: —"
+            three_yr_str = f"3Y: {three_yr_val:+.2f}" if three_yr_val is not None else "3Y: —"
+            change_str = f"{d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str} | {three_yr_str}"
+            msg1 += f"{lead}<b>{html.escape(company_name)} ({symbol})</b> ${price:.2f}\n"
+            msg1 += f"  <i>{sector_name}</i>\n"
+            msg1 += f"  {change_str}\n"
+            if vol > 0:
+                msg1 += f"  Vol: {vol_shares:.2f}M (${dollar_vol:.1f}M)\n\n"
+            else:
+                msg1 += "\n"
+        msg1 += "\n"
 
     # ---------- Message 2: Crypto, Commodities, Forex, ETFs ----------
     msg2 = ""
@@ -413,66 +435,62 @@ def format_stock_message(
         for ac in etf_order:
             if ac not in by_asset_class:
                 continue
-            items = sorted(by_asset_class[ac], key=lambda x: x.get("company_name", x["symbol"]).upper())
+            items = sorted(by_asset_class[ac], key=_pct_sort_key)
             msg2 += f"  <b>▸ {ac}</b>\n"
             for stock in items:
                 symbol = stock["symbol"]
                 company_name = stock.get("company_name", symbol)
+                ac_label = stock.get("asset_class", ac)
                 price = stock["price"]
                 vol = stock.get("volume") or 0
                 vol_shares = vol / 1_000_000
                 dollar_vol = (vol * price) / 1_000_000
-                def pct_str(label: str, pct: Optional[float], passes: bool) -> str:
-                    if pct is None:
-                        return f"{label}: —"
-                    s = f"{label}: {pct:+.2f}%"
-                    return f"<b>{s}</b>" if passes else s
-                d_str = pct_str("1D", stock["one_day_pct"], stock["passes_day"])
-                w_str = pct_str("1W", stock["one_week_pct"], stock["passes_week"])
+                lead = "🟢 " if _all_three_pass(stock) else ""
+                d_str = _pct_str_no_pct("1D", stock["one_day_pct"], stock["passes_day"])
+                w_str = _pct_str_no_pct("1W", stock["one_week_pct"], stock["passes_week"])
                 m_val = stock.get("one_month_pct")
                 m_pass = stock.get("passes_month", False)
-                m_str = pct_str("1M", m_val, m_pass)
+                m_str = _pct_str_no_pct("1M", m_val, m_pass)
                 six_val = stock.get("one_6m_pct")
                 one_yr_val = stock.get("one_year_pct")
                 three_yr_val = stock.get("three_year_pct")
-                six_str = f"6M: {six_val:+.2f}%" if six_val is not None else "6M: —"
-                one_yr_str = f"1Y: {one_yr_val:+.2f}%" if one_yr_val is not None else "1Y: —"
-                three_yr_str = f"3Y: {three_yr_val:+.2f}%" if three_yr_val is not None else "3Y: —"
+                six_str = f"6M: {six_val:+.2f}" if six_val is not None else "6M: —"
+                one_yr_str = f"1Y: {one_yr_val:+.2f}" if one_yr_val is not None else "1Y: —"
+                three_yr_str = f"3Y: {three_yr_val:+.2f}" if three_yr_val is not None else "3Y: —"
                 change_str = f"{d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str} | {three_yr_str}"
-                msg2 += f"<b>{html.escape(company_name)} ({symbol})</b> ${price:.2f}\n"
+                msg2 += f"{lead}<b>{html.escape(company_name)} ({symbol})</b> ${price:.2f}\n"
+                msg2 += f"  <i>{ac_label}</i>\n"
                 msg2 += f"  {change_str}\n"
                 msg2 += f"  Vol: {vol_shares:.2f}M (${dollar_vol:.1f}M)\n\n"
             msg2 += "\n"
         for ac in sorted(by_asset_class.keys()):
             if ac in etf_order:
                 continue
-            items = sorted(by_asset_class[ac], key=lambda x: x.get("company_name", x["symbol"]).upper())
+            items = sorted(by_asset_class[ac], key=_pct_sort_key)
             msg2 += f"  <b>▸ {ac}</b>\n"
             for stock in items:
                 symbol = stock["symbol"]
                 company_name = stock.get("company_name", symbol)
+                ac_label = stock.get("asset_class", ac)
                 price = stock["price"]
                 vol = stock.get("volume") or 0
                 vol_shares = vol / 1_000_000
                 dollar_vol = (vol * price) / 1_000_000
-                def pct_str(label: str, pct: Optional[float], passes: bool) -> str:
-                    if pct is None:
-                        return f"{label}: —"
-                    s = f"{label}: {pct:+.2f}%"
-                    return f"<b>{s}</b>" if passes else s
-                d_str = pct_str("1D", stock["one_day_pct"], stock["passes_day"])
-                w_str = pct_str("1W", stock["one_week_pct"], stock["passes_week"])
+                lead = "🟢 " if _all_three_pass(stock) else ""
+                d_str = _pct_str_no_pct("1D", stock["one_day_pct"], stock["passes_day"])
+                w_str = _pct_str_no_pct("1W", stock["one_week_pct"], stock["passes_week"])
                 m_val = stock.get("one_month_pct")
                 m_pass = stock.get("passes_month", False)
-                m_str = pct_str("1M", m_val, m_pass)
+                m_str = _pct_str_no_pct("1M", m_val, m_pass)
                 six_val = stock.get("one_6m_pct")
                 one_yr_val = stock.get("one_year_pct")
                 three_yr_val = stock.get("three_year_pct")
-                six_str = f"6M: {six_val:+.2f}%" if six_val is not None else "6M: —"
-                one_yr_str = f"1Y: {one_yr_val:+.2f}%" if one_yr_val is not None else "1Y: —"
-                three_yr_str = f"3Y: {three_yr_val:+.2f}%" if three_yr_val is not None else "3Y: —"
+                six_str = f"6M: {six_val:+.2f}" if six_val is not None else "6M: —"
+                one_yr_str = f"1Y: {one_yr_val:+.2f}" if one_yr_val is not None else "1Y: —"
+                three_yr_str = f"3Y: {three_yr_val:+.2f}" if three_yr_val is not None else "3Y: —"
                 change_str = f"{d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str} | {three_yr_str}"
-                msg2 += f"<b>{html.escape(company_name)} ({symbol})</b> ${price:.2f}\n"
+                msg2 += f"{lead}<b>{html.escape(company_name)} ({symbol})</b> ${price:.2f}\n"
+                msg2 += f"  <i>{ac_label}</i>\n"
                 msg2 += f"  {change_str}\n"
                 msg2 += f"  Vol: {vol_shares:.2f}M (${dollar_vol:.1f}M)\n\n"
             msg2 += "\n"
