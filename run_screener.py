@@ -590,10 +590,13 @@ def main() -> None:
         print(f"\nTelegram notification sent (2 messages): {len(results)} stock(s), {etf_count} ETF(s), {crypto_count} crypto, {forex_count} forex, {commodity_count} commodities")
         
         # Generate and send charts only for assets that pass at least 2 of 3 criteria (1D, 1W, 1M)
-        results_for_charts = [
-            r for r in all_results
-            if (r.get("passes_day", False) + r.get("passes_week", False) + r.get("passes_month", False)) >= 2
-        ]
+        def _criteria_count(r: dict) -> int:
+            return sum(
+                1 for k in ("passes_day", "passes_week", "passes_month")
+                if r.get(k)
+            )
+        results_for_charts = [r for r in all_results if _criteria_count(r) >= 2]
+        print(f"  Assets with 2+ criteria (for charts): {len(results_for_charts)}")
         if results_for_charts:
             print("Generating charts...")
             charts = generate_charts_for_results(results_for_charts, config)
