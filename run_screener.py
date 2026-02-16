@@ -227,13 +227,19 @@ def send_telegram_media_group(photo_paths: list, token: str, chat_id: str) -> No
 
 
 def _pct_sort_key(item: dict) -> tuple:
-    """Sort key: biggest price change first by magnitude (abs %), regardless of sign."""
+    """Sort key: largest move in any period that fit the criteria first (by magnitude)."""
     d = item.get("one_day_pct")
     w = item.get("one_week_pct")
     m = item.get("one_month_pct")
-    vals = [abs(v) for v in (d, w, m) if v is not None]
+    vals = []
+    if item.get("passes_day") and d is not None:
+        vals.append(abs(d))
+    if item.get("passes_week") and w is not None:
+        vals.append(abs(w))
+    if item.get("passes_month") and m is not None:
+        vals.append(abs(m))
     max_abs = max(vals) if vals else 0.0
-    return (-max_abs,)  # descending: largest move first
+    return (-max_abs,)  # descending: largest qualifying move first
 
 
 def _pct_str_no_pct(label: str, pct: Optional[float], passes: bool) -> str:
