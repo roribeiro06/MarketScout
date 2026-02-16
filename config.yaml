@@ -37,12 +37,12 @@ forex:
   - symbol: USDCNY=X
     name: "US Dollar / Chinese Yuan"
 
-# Commodity futures: 1D +/-1%, 1W +/-3%, 1M +/-6%, min 50K contracts (so commodities are included when fitting)
+# Commodity futures: 1D +/-2%, 1W +/-5%, 1M +/-10%, min 100K contracts
 commodity_thresholds:
-  one_day_pct_abs: 1.0
-  one_week_pct_abs: 3.0
-  one_month_pct_abs: 6.0
-  min_volume_contracts: 50000
+  one_day_pct_abs: 2.0
+  one_week_pct_abs: 5.0
+  one_month_pct_abs: 10.0
+  min_volume_contracts: 100000
 
 # All commodity futures to track (Yahoo Finance =F symbols)
 commodities:
