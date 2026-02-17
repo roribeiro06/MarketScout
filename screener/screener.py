@@ -479,14 +479,14 @@ def run_commodity_screener(config: Dict) -> List[Dict]:
 
 def screen_etf(symbol: str, name: str, asset_class: str, config: Dict) -> Optional[Dict]:
     """
-    Screen a single ETF: 1D +/-3%, 1W +/-5%, 1M +/-10%, price*volume >= $200M.
+    Screen a single ETF: 1D +/-3%, 1W +/-5%, 1M +/-10%, price*volume >= $1B.
     Returns dict if it passes, None otherwise.
     """
     thresholds = config.get("etf_thresholds") or {
         "one_day_pct_abs": 3.0,
         "one_week_pct_abs": 5.0,
         "one_month_pct_abs": 10.0,
-        "min_dollar_volume": 200_000_000,
+        "min_dollar_volume": 1_000_000_000,
     }
     
     data = fetch_stock_data(symbol, period="5y")
@@ -510,7 +510,7 @@ def screen_etf(symbol: str, name: str, asset_class: str, config: Dict) -> Option
     passes_day = abs(one_day_change) >= thresholds["one_day_pct_abs"]
     passes_week = abs(one_week_change) >= thresholds["one_week_pct_abs"]
     passes_month = one_month_change is not None and abs(one_month_change) >= thresholds["one_month_pct_abs"]
-    passes_volume = dollar_volume >= thresholds.get("min_dollar_volume", 200_000_000)
+    passes_volume = dollar_volume >= thresholds.get("min_dollar_volume", 1_000_000_000)
     
     if not (passes_volume and (passes_day or passes_week or passes_month)):
         return None
