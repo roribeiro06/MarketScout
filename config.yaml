@@ -3,8 +3,8 @@ thresholds:
   one_day_pct_abs: 3.0      # abs(1-day % change) >= 3%
   one_week_pct_abs: 5.0     # abs(1-week % change) >= 5%
   one_month_pct_abs: 10.0   # abs(1-month % change) >= 10%
-  min_volume: 10000000      # >= 10M shares
-  min_price: 5.0            # >= $5 per share
+  min_dollar_volume: 1000000000   # price * volume >= $1B
+  min_price: 10.0           # >= $10 per share
 
 # Exchanges to scan
 exchanges:
@@ -93,12 +93,12 @@ commodities:
   - symbol: LBS=F
     name: Lumber
 
-# ETFs: 1D +/-3%, 1W +/-5%, 1M +/-10%, min volume 20M. Group by asset class.
+# ETFs: 1D +/-3%, 1W +/-5%, 1M +/-10%, price*volume >= $200M. Group by asset class.
 etf_thresholds:
   one_day_pct_abs: 3.0
   one_week_pct_abs: 5.0
   one_month_pct_abs: 10.0
-  min_volume: 20000000
+  min_dollar_volume: 200000000   # price * volume >= $200M
 
 # Order of asset classes for display
 etf_asset_class_order:

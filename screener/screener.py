@@ -15,112 +15,109 @@ def load_config(config_path: str = "config.yaml") -> Dict:
         return yaml.safe_load(f)
 
 
+def _fetch_nasdaq_listed() -> List[str]:
+    """Fetch all NASDAQ-listed common stocks from NASDAQ Trader (exclude ETFs, test issues)."""
+    import requests
+    url = "https://www.nasdaqtrader.com/dynamic/SymDir/nasdaqlisted.txt"
+    try:
+        r = requests.get(url, timeout=15)
+        r.raise_for_status()
+        lines = r.text.strip().split("\n")
+        symbols = []
+        for line in lines[1:]:  # skip header
+            parts = line.split("|")
+            if len(parts) < 8:
+                continue
+            symbol, _, _, test_issue, _, _, etf, next_shares = parts[0].strip(), parts[1], parts[2], parts[3].strip(), parts[4], parts[5], parts[6].strip(), parts[7].strip()
+            if etf != "N" or test_issue != "N" or next_shares != "N":
+                continue
+            if not symbol or "$" in symbol:
+                continue
+            symbols.append(symbol)
+        return list(dict.fromkeys(symbols))
+    except Exception as e:
+        print(f"Error fetching nasdaqlisted.txt: {e}")
+        return []
+
+
+def _fetch_other_listed_nyse() -> List[str]:
+    """Fetch all NYSE common stocks from NASDAQ Trader otherlisted.txt (Exchange=N, exclude ETFs, test, preferred)."""
+    import requests
+    url = "https://www.nasdaqtrader.com/dynamic/SymDir/otherlisted.txt"
+    try:
+        r = requests.get(url, timeout=15)
+        r.raise_for_status()
+        lines = r.text.strip().split("\n")
+        symbols = []
+        for line in lines[1:]:
+            parts = line.split("|")
+            if len(parts) < 8:
+                continue
+            act_symbol, _, exchange, _, etf, _, test_issue, nasdaq_symbol = parts[0].strip(), parts[1], parts[2].strip(), parts[3], parts[4].strip(), parts[5], parts[6].strip(), (parts[7] or "").strip()
+            if exchange != "N":
+                continue
+            if etf != "N" or test_issue != "N":
+                continue
+            if "$" in act_symbol:
+                continue
+            symbol = nasdaq_symbol or act_symbol
+            if not symbol:
+                continue
+            symbols.append(symbol)
+        return list(dict.fromkeys(symbols))
+    except Exception as e:
+        print(f"Error fetching otherlisted.txt: {e}")
+        return []
+
+
+def _fallback_exchange_symbols(exchange: str) -> List[str]:
+    """Fallback ticker list when NASDAQ Trader fetch fails."""
+    if exchange == "NYSE":
+        return [
+            "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "META", "NVDA", "JPM",
+            "V", "JNJ", "WMT", "PG", "MA", "UNH", "HD", "DIS", "BAC", "XOM",
+            "CVX", "ABBV", "PFE", "KO", "AVGO", "COST", "MRK", "PEP", "TMO",
+            "CSCO", "ABT", "ACN", "NFLX", "ADBE", "CMCSA", "NKE", "TXN",
+            "HOOD", "COIN", "RIVN", "NBIS", "CRWV", "TOST", "PLTR", "SOFI",
+            "LCID", "RBLX", "SNOW", "DDOG", "NET", "ZM", "DOCN", "UPST",
+            "AFRM", "OPEN", "WISH", "CLOV", "SPCE", "FUBO", "NIO", "XPEV",
+            "LI", "BABA", "JD", "PDD", "BILI", "TME", "VIPS", "WB", "DKNG"
+        ]
+    elif exchange == "NASDAQ":
+        return [
+            "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "META", "NVDA", "AVGO",
+            "COST", "NFLX", "ADBE", "CMCSA", "INTC", "AMD", "QCOM", "AMGN",
+            "ISRG", "BKNG", "REGN", "VRTX", "ADI", "SNPS", "CDNS", "KLAC",
+            "MCHP", "CTSH", "FTNT", "PAYX", "FAST", "CTAS", "WBD", "LRCX",
+            "HOOD", "COIN", "RIVN", "NBIS", "CRWV", "TOST", "PLTR", "SOFI",
+            "LCID", "RBLX", "SNOW", "DDOG", "NET", "ZM", "DOCN", "UPST",
+            "AFRM", "OPEN", "WISH", "CLOV", "SPCE", "FUBO", "NIO", "XPEV",
+            "DKNG"
+        ]
+    return []
+
+
 def get_exchange_symbols(exchange: str) -> List[str]:
     """
-    Get list of symbols for an exchange using yfinance.
-    Fetches tickers from major indices to get comprehensive coverage.
+    Get list of all common stock symbols for an exchange.
+    Uses NASDAQ Trader symbol directory (nasdaqlisted.txt for NASDAQ, otherlisted.txt for NYSE).
+    Excludes ETFs, test issues, and preferred/warrants. Falls back to a short list if fetch fails.
     """
-    import yfinance as yf
-    
-    all_symbols = set()
-    
     try:
-        # Get S&P 500 tickers (covers many NYSE stocks)
-        if exchange == "NYSE":
-            try:
-                sp500 = yf.Ticker("^GSPC")
-                # Get components from Wikipedia or use a known list
-                # For now, we'll use a comprehensive approach
-                import requests
-                from bs4 import BeautifulSoup
-                
-                # Fetch S&P 500 list from Wikipedia
-                url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
-                response = requests.get(url, timeout=10)
-                if response.status_code == 200:
-                    soup = BeautifulSoup(response.content, 'html.parser')
-                    table = soup.find('table', {'id': 'constituents'})
-                    if table:
-                        for row in table.find_all('tr')[1:]:  # Skip header
-                            cells = row.find_all('td')
-                            if cells:
-                                symbol = cells[0].text.strip()
-                                all_symbols.add(symbol)
-            except Exception as e:
-                print(f"Error fetching S&P 500 list: {e}")
-        
-        # Get NASDAQ 100 tickers
         if exchange == "NASDAQ":
-            try:
-                import requests
-                from bs4 import BeautifulSoup
-                
-                # Fetch NASDAQ 100 list
-                url = "https://en.wikipedia.org/wiki/NASDAQ-100"
-                response = requests.get(url, timeout=10)
-                if response.status_code == 200:
-                    soup = BeautifulSoup(response.content, 'html.parser')
-                    # Find the table with NASDAQ 100 components
-                    tables = soup.find_all('table', {'class': 'wikitable'})
-                    for table in tables:
-                        for row in table.find_all('tr')[1:]:  # Skip header
-                            cells = row.find_all('td')
-                            if cells and len(cells) > 0:
-                                symbol_cell = cells[0].find('a')
-                                if symbol_cell:
-                                    symbol = symbol_cell.text.strip()
-                                    all_symbols.add(symbol)
-            except Exception as e:
-                print(f"Error fetching NASDAQ 100 list: {e}")
-        
-        # Fallback: Use comprehensive ticker lists if web scraping fails
-        if not all_symbols:
-            print(f"Using fallback ticker list for {exchange}...")
-            # Expanded list covering more stocks
-            if exchange == "NYSE":
-                return [
-                    "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "META", "NVDA", "JPM",
-                    "V", "JNJ", "WMT", "PG", "MA", "UNH", "HD", "DIS", "BAC", "XOM",
-                    "CVX", "ABBV", "PFE", "KO", "AVGO", "COST", "MRK", "PEP", "TMO",
-                    "CSCO", "ABT", "ACN", "NFLX", "ADBE", "CMCSA", "NKE", "TXN",
-                    "HOOD", "COIN", "RIVN", "NBIS", "CRWV", "TOST", "PLTR", "SOFI",
-                    "LCID", "RBLX", "SNOW", "DDOG", "NET", "ZM", "DOCN", "UPST",
-                    "AFRM", "OPEN", "WISH", "CLOV", "SPCE", "FUBO", "NIO", "XPEV",
-                    "LI", "BABA", "JD", "PDD", "BILI", "TME", "VIPS", "WB"
-                ]
-            elif exchange == "NASDAQ":
-                return [
-                    "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "META", "NVDA", "AVGO",
-                    "COST", "NFLX", "ADBE", "CMCSA", "INTC", "AMD", "QCOM", "AMGN",
-                    "ISRG", "BKNG", "REGN", "VRTX", "ADI", "SNPS", "CDNS", "KLAC",
-                    "MCHP", "CTSH", "FTNT", "PAYX", "FAST", "CTAS", "WBD", "LRCX",
-                    "HOOD", "COIN", "RIVN", "NBIS", "CRWV", "TOST", "PLTR", "SOFI",
-                    "LCID", "RBLX", "SNOW", "DDOG", "NET", "ZM", "DOCN", "UPST",
-                    "AFRM", "OPEN", "WISH", "CLOV", "SPCE", "FUBO", "NIO", "XPEV"
-                ]
-        
-        return list(all_symbols)
-        
+            symbols = _fetch_nasdaq_listed()
+        elif exchange == "NYSE":
+            symbols = _fetch_other_listed_nyse()
+        else:
+            symbols = []
+        if symbols:
+            print(f"  Loaded {len(symbols)} symbols for {exchange}")
+            return symbols
+        print(f"Using fallback ticker list for {exchange}...")
+        return _fallback_exchange_symbols(exchange)
     except Exception as e:
         print(f"Error getting {exchange} symbols: {e}")
-        # Return expanded fallback list
-        if exchange == "NYSE":
-            return [
-                "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "META", "NVDA", "JPM",
-                "V", "JNJ", "WMT", "PG", "MA", "UNH", "HD", "DIS", "BAC", "XOM",
-                "CVX", "ABBV", "PFE", "KO", "AVGO", "COST", "MRK", "PEP", "TMO",
-                "CSCO", "ABT", "ACN", "NFLX", "ADBE", "CMCSA", "NKE", "TXN",
-                "HOOD", "COIN", "RIVN", "NBIS", "CRWV", "TOST"
-            ]
-        elif exchange == "NASDAQ":
-            return [
-                "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "META", "NVDA", "AVGO",
-                "COST", "NFLX", "ADBE", "CMCSA", "INTC", "AMD", "QCOM", "AMGN",
-                "ISRG", "BKNG", "REGN", "VRTX", "ADI", "SNPS", "CDNS", "KLAC",
-                "MCHP", "CTSH", "FTNT", "PAYX", "FAST", "CTAS", "WBD", "LRCX",
-                "HOOD", "COIN", "RIVN", "NBIS", "CRWV", "TOST"
-            ]
-        return []
+        return _fallback_exchange_symbols(exchange)
 
 
 def fetch_stock_data(symbol: str, period: str = "1mo") -> Optional[pd.DataFrame]:
@@ -178,12 +175,13 @@ def screen_stock(symbol: str, config: Dict) -> Optional[Dict]:
     # Get current volume and price
     current_volume = data["Volume"].iloc[-1]
     current_price = data["Close"].iloc[-1]
+    dollar_volume = current_price * current_volume
     
-    # Check thresholds
+    # Check thresholds (stocks: price*volume >= $1B, price >= $10)
     passes_day = abs(one_day_change) >= thresholds["one_day_pct_abs"]
     passes_week = abs(one_week_change) >= thresholds["one_week_pct_abs"]
     passes_month = one_month_change is not None and abs(one_month_change) >= thresholds["one_month_pct_abs"]
-    passes_volume = current_volume >= thresholds["min_volume"]
+    passes_volume = dollar_volume >= thresholds.get("min_dollar_volume", 1_000_000_000)
     passes_price = current_price >= thresholds.get("min_price", 0)  # Default to 0 if not specified
     
     # Stock passes if it meets any threshold AND volume AND price requirements
@@ -481,14 +479,14 @@ def run_commodity_screener(config: Dict) -> List[Dict]:
 
 def screen_etf(symbol: str, name: str, asset_class: str, config: Dict) -> Optional[Dict]:
     """
-    Screen a single ETF: 1D +/-3%, 1W +/-5%, 1M +/-10%, min volume 20M.
+    Screen a single ETF: 1D +/-3%, 1W +/-5%, 1M +/-10%, price*volume >= $200M.
     Returns dict if it passes, None otherwise.
     """
     thresholds = config.get("etf_thresholds") or {
         "one_day_pct_abs": 3.0,
         "one_week_pct_abs": 5.0,
         "one_month_pct_abs": 10.0,
-        "min_volume": 20_000_000,
+        "min_dollar_volume": 200_000_000,
     }
     
     data = fetch_stock_data(symbol, period="5y")
@@ -507,11 +505,12 @@ def screen_etf(symbol: str, name: str, asset_class: str, config: Dict) -> Option
     
     current_price = data["Close"].iloc[-1]
     current_volume = int(data["Volume"].iloc[-1]) if "Volume" in data.columns else 0
+    dollar_volume = current_price * current_volume
     
     passes_day = abs(one_day_change) >= thresholds["one_day_pct_abs"]
     passes_week = abs(one_week_change) >= thresholds["one_week_pct_abs"]
     passes_month = one_month_change is not None and abs(one_month_change) >= thresholds["one_month_pct_abs"]
-    passes_volume = current_volume >= thresholds.get("min_volume", 20_000_000)
+    passes_volume = dollar_volume >= thresholds.get("min_dollar_volume", 200_000_000)
     
     if not (passes_volume and (passes_day or passes_week or passes_month)):
         return None
