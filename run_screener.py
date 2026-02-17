@@ -1,13 +1,15 @@
 """Main entry point for MarketScout stock screener."""
 import html
 import os
+import re
 import requests
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 import yfinance as yf
-from screener.screener import load_config, run_screener, run_crypto_screener, run_forex_screener, run_commodity_screener, run_etf_screener
+from screener.screener import load_config, run_screener, run_rising_stars_screener, run_crypto_screener, run_forex_screener, run_commodity_screener, run_etf_screener
 from screener.charts import generate_charts_for_results
 
 # Indices to show at top (symbol, display name). VIX gets 1D only; others get 1D/1W/1M.
@@ -124,7 +126,9 @@ def _telegram_400_hint(response_text: str) -> str:
 
 
 def _strip_html_to_plain(s: str) -> str:
-    """Convert our simple HTML (only <b>/</b> and entities) to plain text for Telegram fallback."""
+    """Convert our simple HTML to plain text for Telegram fallback (e.g. when <span> is rejected)."""
+    s = re.sub(r"<span[^>]*>", "", s)
+    s = s.replace("</span>", "")
     s = s.replace("</b>", "").replace("<b>", "")
     s = s.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
     return s
@@ -182,9 +186,9 @@ def send_telegram_message(text: str, token: str, chat_id: str) -> None:
         try:
             _telegram_send_message(url, payload)
         except requests.exceptions.HTTPError as e:
-            if e.response.status_code == 400 and "entities" in (e.response.text or "").lower():
+            if e.response.status_code == 400:
                 plain_chunk = _strip_html_to_plain(chunk)
-                print("Retrying as plain text (HTML rejected).", flush=True)
+                print("Retrying as plain text (HTML rejected by Telegram).", flush=True)
                 _telegram_send_message(url, {"chat_id": chat_id_param, "text": plain_chunk})
             else:
                 raise
@@ -243,11 +247,13 @@ def _pct_sort_key(item: dict) -> tuple:
 
 
 def _pct_str_no_pct(label: str, pct: Optional[float], passes: bool) -> str:
-    """Format percentage without '%' for Telegram. Bold if passes threshold."""
+    """Format percentage without '%' for Telegram. When passes: 🟢 if positive, 🔴 if negative."""
     if pct is None:
         return f"{label}: —"
     s = f"{label}: {pct:+.2f}"
-    return f"<b>{s}</b>" if passes else s
+    if passes:
+        return ("🟢 " if pct >= 0 else "🔴 ") + s
+    return s
 
 
 def _all_three_pass(item: dict) -> bool:
@@ -280,7 +286,7 @@ def _append_section_block(
         vol = stock.get("volume") or 0
         vol_shares = vol / 1_000_000
         dollar_vol = (vol * price) / 1_000_000
-        lead = "🟢 " if _all_three_pass(stock) else ""
+        lead = "🟡 " if _all_three_pass(stock) else ""
 
         d_str = _pct_str_no_pct("1D", stock["one_day_pct"], stock["passes_day"])
         w_str = _pct_str_no_pct("1W", stock["one_week_pct"], stock["passes_week"])
@@ -324,12 +330,16 @@ def format_stock_message(
     etf_count: int = 0,
     indices_data: Optional[List[Dict]] = None,
     etf_asset_class_order: Optional[List[str]] = None,
+    collection_time: Optional[str] = None,
 ) -> Tuple[str, str]:
-    """Format screening results into two Telegram messages: (1) Indices, Stocks; (2) Crypto, Commodities, Forex, ETFs."""
-    stock_count = len(results) - crypto_count - forex_count - commodity_count - etf_count
+    """Format screening results into two Telegram messages: (1) Indices, Stocks, Rising Stars; (2) Crypto, Commodities, Forex, ETFs."""
+    non_stock_sectors = {"Crypto", "Forex", "Commodities", "ETFs"}
+    stock_count = sum(1 for r in results if r.get("sector") not in non_stock_sectors and r.get("sector") != "Rising Stars")
+    rising_stars_count = sum(1 for r in results if r.get("sector") == "Rising Stars")
     if not results and not indices_data:
+        header = ("🕐 Data as of " + collection_time + "\n\n" if collection_time else "") + "📊 <b>MarketScout Scan</b>\n\n"
         return (
-            "📊 <b>MarketScout Scan</b>\n\nNo stocks, crypto, forex, commodities, or ETFs found matching criteria.",
+            header + "No stocks, crypto, forex, commodities, or ETFs found matching criteria.",
             "",
         )
 
@@ -338,14 +348,20 @@ def format_stock_message(
         sector = stock.get("sector", "Other")
         by_sector.setdefault(sector, []).append(stock)
     non_stock = {"Crypto", "Forex", "Commodities", "ETFs"}
-    stock_sectors = sorted([s for s in by_sector if s not in non_stock], key=lambda s: (s == "Other", s.upper()))
+    stock_sectors_regular = sorted(
+        [s for s in by_sector if s not in non_stock and s != "Rising Stars"],
+        key=lambda s: (s == "Other", s.upper()),
+    )
+    stock_sectors = stock_sectors_regular + (["Rising Stars"] if "Rising Stars" in by_sector else [])
     SECTION_EMOJI = {"Crypto": "🪙", "Commodities": "🌾", "Forex": "💵"}
 
-    # ---------- Message 1: Indices, Stocks, Crypto ----------
-    msg1 = "📊 <b>MarketScout Scan</b>\n"
+    # ---------- Message 1: Indices, Stocks, Rising Stars, Crypto ----------
+    msg1 = ("🕐 Data as of " + collection_time + "\n\n" if collection_time else "") + "📊 <b>MarketScout Scan</b>\n"
     parts = []
     if stock_count:
         parts.append(f"{stock_count} stock(s)")
+    if rising_stars_count:
+        parts.append(f"{rising_stars_count} rising star(s)")
     if etf_count:
         parts.append(f"{etf_count} ETF(s)")
     if crypto_count:
@@ -389,40 +405,75 @@ def format_stock_message(
         msg1 += "\n"
 
     if stock_sectors:
-        msg1 += "<b>📈 Stocks</b>\n"
-        all_stocks = []
-        for sector in stock_sectors:
-            all_stocks.extend(by_sector[sector])
-        all_stocks.sort(key=_pct_sort_key)
-        for stock in all_stocks:
-            symbol = stock["symbol"]
-            company_name = stock.get("company_name", symbol)
-            sector_name = stock.get("sector", "Other")
-            price = stock["price"]
-            vol = stock.get("volume") or 0
-            vol_shares = vol / 1_000_000
-            dollar_vol = (vol * price) / 1_000_000
-            lead = "🟢 " if _all_three_pass(stock) else ""
-            d_str = _pct_str_no_pct("1D", stock["one_day_pct"], stock["passes_day"])
-            w_str = _pct_str_no_pct("1W", stock["one_week_pct"], stock["passes_week"])
-            m_val = stock.get("one_month_pct")
-            m_pass = stock.get("passes_month", False)
-            m_str = _pct_str_no_pct("1M", m_val, m_pass)
-            six_val = stock.get("one_6m_pct")
-            one_yr_val = stock.get("one_year_pct")
-            three_yr_val = stock.get("three_year_pct")
-            six_str = f"6M: {six_val:+.2f}" if six_val is not None else "6M: —"
-            one_yr_str = f"1Y: {one_yr_val:+.2f}" if one_yr_val is not None else "1Y: —"
-            three_yr_str = f"3Y: {three_yr_val:+.2f}" if three_yr_val is not None else "3Y: —"
-            change_str = f"{d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str} | {three_yr_str}"
-            msg1 += f"{lead}<b>{html.escape(company_name)} ({symbol})</b> ${price:.2f}\n"
-            msg1 += f"  <i>{sector_name}</i>\n"
-            msg1 += f"  {change_str}\n"
-            if vol > 0:
-                msg1 += f"  Vol: {vol_shares:.2f}M (${dollar_vol:.1f}M)\n\n"
-            else:
-                msg1 += "\n"
-        msg1 += "\n"
+        # Big stocks first (≥$1B price×volume; all sectors except Rising Stars)
+        if stock_sectors_regular:
+            msg1 += "<b>📈 Stocks (≥$1B vol)</b>\n"
+            all_stocks = []
+            for sector in stock_sectors_regular:
+                all_stocks.extend(by_sector[sector])
+            all_stocks.sort(key=_pct_sort_key)
+            for stock in all_stocks:
+                symbol = stock["symbol"]
+                company_name = stock.get("company_name", symbol)
+                sector_name = stock.get("sector", "Other")
+                price = stock["price"]
+                vol = stock.get("volume") or 0
+                vol_shares = vol / 1_000_000
+                dollar_vol = (vol * price) / 1_000_000
+                lead = "🟡 " if _all_three_pass(stock) else ""
+                d_str = _pct_str_no_pct("1D", stock["one_day_pct"], stock["passes_day"])
+                w_str = _pct_str_no_pct("1W", stock["one_week_pct"], stock["passes_week"])
+                m_val = stock.get("one_month_pct")
+                m_pass = stock.get("passes_month", False)
+                m_str = _pct_str_no_pct("1M", m_val, m_pass)
+                six_val = stock.get("one_6m_pct")
+                one_yr_val = stock.get("one_year_pct")
+                three_yr_val = stock.get("three_year_pct")
+                six_str = f"6M: {six_val:+.2f}" if six_val is not None else "6M: —"
+                one_yr_str = f"1Y: {one_yr_val:+.2f}" if one_yr_val is not None else "1Y: —"
+                three_yr_str = f"3Y: {three_yr_val:+.2f}" if three_yr_val is not None else "3Y: —"
+                change_str = f"{d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str} | {three_yr_str}"
+                msg1 += f"{lead}<b>{html.escape(company_name)} ({symbol})</b> ${price:.2f}\n"
+                msg1 += f"  <i>{sector_name}</i>\n"
+                msg1 += f"  {change_str}\n"
+                if vol > 0:
+                    msg1 += f"  Vol: {vol_shares:.2f}M (${dollar_vol:.1f}M)\n\n"
+                else:
+                    msg1 += "\n"
+            msg1 += "\n"
+        # Rising Stars section (500M–1B price×volume); show real sector under each stock
+        if "Rising Stars" in by_sector:
+            msg1 += "<b>⭐ Rising Stars (500M–$1B vol)</b>\n"
+            rising_stocks = sorted(by_sector["Rising Stars"], key=_pct_sort_key)
+            for stock in rising_stocks:
+                symbol = stock["symbol"]
+                company_name = stock.get("company_name", symbol)
+                sector_name = stock.get("display_sector") or stock.get("sector", "Other")
+                price = stock["price"]
+                vol = stock.get("volume") or 0
+                vol_shares = vol / 1_000_000
+                dollar_vol = (vol * price) / 1_000_000
+                lead = "🟡 " if _all_three_pass(stock) else ""
+                d_str = _pct_str_no_pct("1D", stock["one_day_pct"], stock["passes_day"])
+                w_str = _pct_str_no_pct("1W", stock["one_week_pct"], stock["passes_week"])
+                m_val = stock.get("one_month_pct")
+                m_pass = stock.get("passes_month", False)
+                m_str = _pct_str_no_pct("1M", m_val, m_pass)
+                six_val = stock.get("one_6m_pct")
+                one_yr_val = stock.get("one_year_pct")
+                three_yr_val = stock.get("three_year_pct")
+                six_str = f"6M: {six_val:+.2f}" if six_val is not None else "6M: —"
+                one_yr_str = f"1Y: {one_yr_val:+.2f}" if one_yr_val is not None else "1Y: —"
+                three_yr_str = f"3Y: {three_yr_val:+.2f}" if three_yr_val is not None else "3Y: —"
+                change_str = f"{d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str} | {three_yr_str}"
+                msg1 += f"{lead}<b>{html.escape(company_name)} ({symbol})</b> ${price:.2f}\n"
+                msg1 += f"  <i>{sector_name}</i>\n"
+                msg1 += f"  {change_str}\n"
+                if vol > 0:
+                    msg1 += f"  Vol: {vol_shares:.2f}M (${dollar_vol:.1f}M)\n\n"
+                else:
+                    msg1 += "\n"
+            msg1 += "\n"
 
     # ---------- Message 2: Crypto, Commodities, Forex, ETFs ----------
     msg2 = ""
@@ -451,7 +502,7 @@ def format_stock_message(
                 vol = stock.get("volume") or 0
                 vol_shares = vol / 1_000_000
                 dollar_vol = (vol * price) / 1_000_000
-                lead = "🟢 " if _all_three_pass(stock) else ""
+                lead = "🟡 " if _all_three_pass(stock) else ""
                 d_str = _pct_str_no_pct("1D", stock["one_day_pct"], stock["passes_day"])
                 w_str = _pct_str_no_pct("1W", stock["one_week_pct"], stock["passes_week"])
                 m_val = stock.get("one_month_pct")
@@ -482,7 +533,7 @@ def format_stock_message(
                 vol = stock.get("volume") or 0
                 vol_shares = vol / 1_000_000
                 dollar_vol = (vol * price) / 1_000_000
-                lead = "🟢 " if _all_three_pass(stock) else ""
+                lead = "🟡 " if _all_three_pass(stock) else ""
                 d_str = _pct_str_no_pct("1D", stock["one_day_pct"], stock["passes_day"])
                 w_str = _pct_str_no_pct("1W", stock["one_week_pct"], stock["passes_week"])
                 m_val = stock.get("one_month_pct")
@@ -502,7 +553,7 @@ def format_stock_message(
             msg2 += "\n"
 
     if msg2.strip():
-        msg2 = "📊 <b>MarketScout Scan (2/2)</b>\n\n" + msg2
+        msg2 = (("🕐 Data as of " + collection_time + "\n\n") if collection_time else "") + "📊 <b>MarketScout Scan (2/2)</b>\n\n" + msg2
     return (msg1.strip(), msg2.strip())
 
 
@@ -521,15 +572,29 @@ def main() -> None:
     stocks_only = (os.getenv("MARKETSCOUT_STOCKS_ONLY") or "").strip().lower() in ("1", "true", "yes")
     if stocks_only:
         print("MARKETSCOUT_STOCKS_ONLY: sending stocks only (no indices, crypto, commodities, forex, ETFs).")
-    
+
+    # Quick sample: scan a short symbol list so a real report can be sent in ~1–2 min (for preview)
+    quick_sample = (os.getenv("MARKETSCOUT_QUICK_SAMPLE") or "").strip().lower() in ("1", "true", "yes")
+    sample_symbols = None
+    if quick_sample:
+        sample_symbols = list(dict.fromkeys([
+            "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "META", "NVDA", "JPM", "V", "WMT", "NFLX", "PLTR",
+            "BAC", "XOM", "KO", "COST", "PEP", "CMCSA", "NKE", "RIVN", "ADBE", "INTC", "AMD", "AVGO",
+            "DIS", "HD", "MCD", "CRM", "ORCL", "ABT", "ACN", "DHR", "GE", "CAT", "UNP", "HON",
+        ]))
+        print(f"MARKETSCOUT_QUICK_SAMPLE: scanning {len(sample_symbols)} symbols only (real data, quick send).")
+
     if not stocks_only:
         print("Fetching indices...")
         indices_data = get_indices_snapshot()
     else:
         indices_data = []
-    
+
     print("Starting MarketScout screener...")
-    results = run_screener(config)
+    results = run_screener(config, symbols_override=sample_symbols)
+    rising_stars_results = []
+    if not stocks_only and config.get("rising_stars_thresholds"):
+        rising_stars_results = run_rising_stars_screener(config, symbols_override=sample_symbols)
     
     if stocks_only:
         crypto_results = []
@@ -546,13 +611,14 @@ def main() -> None:
         print("Scanning ETFs...")
         etf_results = run_etf_screener(config)
     
-    all_results = results + crypto_results + forex_results + commodity_results + etf_results
+    collection_time = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M %Z")
+    all_results = results + rising_stars_results + crypto_results + forex_results + commodity_results + etf_results
     crypto_count = len(crypto_results)
     forex_count = len(forex_results)
     commodity_count = len(commodity_results)
     etf_count = len(etf_results)
     
-    # Format into two messages: (1) Indices, Stocks, Crypto; (2) Commodities, Forex, ETFs
+    # Format into two messages: (1) Indices, Stocks, Rising Stars, Crypto; (2) Commodities, Forex, ETFs
     message1, message2 = format_stock_message(
         all_results,
         crypto_count=crypto_count,
@@ -561,6 +627,7 @@ def main() -> None:
         etf_count=etf_count,
         indices_data=indices_data,
         etf_asset_class_order=config.get("etf_asset_class_order"),
+        collection_time=collection_time,
     )
     
     if dry_run:
@@ -572,7 +639,7 @@ def main() -> None:
             print(f"Message 2 written to sample_report_2.txt ({len(message2)} chars)")
         print("(Telegram notification skipped)")
     else:
-        # Send Telegram notification (two messages)
+        # Send Telegram notification (two messages). Only this path sends to Telegram; data is live (not mock).
         token = (os.getenv("TELEGRAM_BOT_TOKEN") or "").strip()
         chat_id = (os.getenv("TELEGRAM_CHAT_ID") or "").strip()
         

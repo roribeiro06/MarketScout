@@ -1,154 +1,503 @@
+🕐 Data as of 2026-02-17 14:02 UTC
+
 📊 <b>MarketScout Scan</b>
-Found 28 stock(s) + 2 ETF(s) + 2 crypto + 1 forex + 1 commodities matching criteria:
+Found 38 stock(s) + 58 rising star(s) matching criteria:
 
 <b>🌍 Indices</b>
-<b>S&P 500 (^GSPC)</b> 6836.17
-  1D: +0.05% | 1W: -1.39% | 1M: -1.56% | 6M: +5.68% | 1Y: +12.96% | 3Y: +66.01%
+<b>S&amp;P 500 (^GSPC)</b> 6841.94
+  1D: +0.08 | 1W: -1.76 | 1M: -1.41 | 6M: +6.08 | 1Y: +11.89 | 3Y: +67.63
 
-<b>Nasdaq (^IXIC)</b> 22546.67
-  1D: -0.22% | 1W: -2.10% | 1M: -4.18% | 6M: +3.85% | 1Y: +14.74% | 3Y: +89.30%
+<b>Nasdaq (^IXIC)</b> 22571.91
+  1D: +0.11 | 1W: -2.87 | 1M: -4.01 | 6M: +4.39 | 1Y: +13.17 | 3Y: +91.46
 
-<b>Dow 30 (^DJI)</b> 49500.93
-  1D: +0.10% | 1W: -1.23% | 1M: +0.12% | 6M: +10.22% | 1Y: +11.57% | 3Y: +45.81%
+<b>Dow 30 (^DJI)</b> 49516.66
+  1D: +0.03 | 1W: -1.24 | 1M: +0.32 | 6M: +10.17 | 1Y: +10.75 | 3Y: +46.93
 
-<b>Russell 2000 (^RUT)</b> 2646.70
-  1D: +1.18% | 1W: -0.89% | 1M: -1.04% | 6M: +15.12% | 1Y: +17.32% | 3Y: +36.25%
+<b>Russell 2000 (^RUT)</b> 2636.94
+  1D: -0.37 | 1W: -1.94 | 1M: -1.52 | 6M: +15.33 | 1Y: +15.54 | 3Y: +37.67
 
-<b>VIX (^VIX)</b> 20.60  1D: -1.06% | 6M: +38.91% | 1Y: +29.64% | 3Y: +4.94%
+<b>VIX (^VIX)</b> 20.93  1D: +1.60
 
 
 <b>📈 Stocks</b>
-  <b>▸ Communication Services</b>
-<b>Alphabet Inc. (GOOGL)</b> $305.72
-  1D: -1.06% | <b>1W: -5.31%</b> | 1M: -8.13% | 6M: +50.88% | 1Y: +67.16% | 3Y: +209.98%
-  Vol: 38.47M ($11759.5M)
+🟡 <b>Lumentum Holdings Inc. (LITE)</b> $611.00
+  <i>Technology</i>
+  🟢 1D: +8.58 | 🟢 1W: +5.87 | 🟢 1M: +88.43 | 6M: +427.36 | 1Y: +682.03 | 3Y: +913.27
+  Vol: 3.74M ($2287.3M)
 
-<b>Comcast Corporation (CMCSA)</b> $31.57
-  1D: -0.79% | 1W: +0.64% | <b>1M: +11.36%</b> | 6M: +4.69% | 1Y: +0.49% | 3Y: -4.00%
-  Vol: 28.49M ($899.3M)
+<b>Sandisk Corporation (SNDK)</b> $603.95
+  <i>Technology</i>
+  🔴 1D: -3.61 | 1W: +3.52 | 🟢 1M: +46.02 | 6M: +1255.97 | 1Y: +1577.64 | 3Y: +1577.64
+  Vol: 13.14M ($7933.6M)
+
+🟡 <b>Masimo Corporation (MASI)</b> $174.95
+  <i>Healthcare</i>
+  🟢 1D: +34.42 | 🟢 1W: +29.78 | 🟢 1M: +23.16 | 6M: +13.70 | 1Y: -2.58 | 3Y: +5.83
+  Vol: 11.45M ($2002.8M)
+
+<b>AppLovin Corporation (APP)</b> $379.64
+  <i>Communication Services</i>
+  1D: -2.79 | 🔴 1W: -17.54 | 🔴 1M: -33.25 | 6M: -13.46 | 1Y: -19.51 | 3Y: +2256.56
+  Vol: 3.00M ($1140.6M)
+
+🟡 <b>Intuit Inc. (INTU)</b> $379.64
+  <i>Technology</i>
+  🔴 1D: -4.95 | 🔴 1W: -13.23 | 🔴 1M: -30.38 | 6M: -46.84 | 1Y: -34.54 | 3Y: -7.76
+  Vol: 3.24M ($1228.4M)
+
+<b>Coinbase Global, Inc. (COIN)</b> $168.99
+  <i>Financial Services</i>
+  1D: +2.84 | 1W: +1.04 | 🔴 1M: -29.92 | 6M: -46.78 | 1Y: -43.31 | 3Y: +183.40
+  Vol: 11.09M ($1874.0M)
+
+<b>Robinhood Markets, Inc. (HOOD)</b> $76.30
+  <i>Financial Services</i>
+  1D: +0.43 | 🔴 1W: -11.85 | 🔴 1M: -29.83 | 6M: -33.17 | 1Y: +19.59 | 3Y: +656.94
+  Vol: 21.07M ($1608.0M)
+
+<b>Western Digital Corporation (WDC)</b> $284.39
+  <i>Technology</i>
+  1D: +1.00 | 1W: -0.56 | 🟢 1M: +28.38 | 6M: +279.62 | 1Y: +459.04 | 3Y: +799.46
+  Vol: 3.79M ($1078.1M)
+
+<b>Shopify Inc. (SHOP)</b> $114.32
+  <i>Technology</i>
+  1D: +1.44 | 1W: -3.45 | 🔴 1M: -26.63 | 6M: -19.19 | 1Y: -10.44 | 3Y: +130.30
+  Vol: 9.75M ($1115.0M)
+
+<b>Strategy Inc (MSTR)</b> $131.31
+  <i>Technology</i>
+  1D: -1.92 | 🔴 1W: -5.15 | 🔴 1M: -24.41 | 6M: -64.15 | 1Y: -59.59 | 3Y: +427.26
+  Vol: 11.80M ($1549.3M)
+
+<b>Palantir Technologies Inc. (PLTR)</b> $132.92
+  <i>Technology</i>
+  1D: +1.15 | 🔴 1W: -6.99 | 🔴 1M: -22.25 | 6M: -24.98 | 1Y: +12.73 | 3Y: +1571.95
+  Vol: 30.60M ($4067.1M)
+
+<b>GE Vernova Inc. (GEV)</b> $821.34
+  <i>Industrials</i>
+  1D: +2.39 | 1W: +2.47 | 🟢 1M: +20.51 | 6M: +32.22 | 1Y: +122.32 | 3Y: +527.73
+  Vol: 1.22M ($1000.9M)
+
+<b>Oracle Corporation (ORCL)</b> $154.17
+  <i>Technology</i>
+  🔴 1D: -3.73 | 1W: -1.55 | 🔴 1M: -19.32 | 6M: -37.63 | 1Y: -10.43 | 3Y: +84.45
+  Vol: 11.06M ($1704.5M)
+
+<b>Booking Holdings Inc. (BKNG)</b> $4151.59
+  <i>Consumer Cyclical</i>
+  1D: +0.27 | 1W: -2.02 | 🔴 1M: -18.85 | 6M: -23.61 | 1Y: -16.50 | 3Y: +73.21
+  Vol: 0.26M ($1062.0M)
+
+<b>Salesforce, Inc. (CRM)</b> $184.85
+  <i>Technology</i>
+  1D: -2.56 | 1W: -4.73 | 🔴 1M: -18.61 | 6M: -23.50 | 1Y: -43.59 | 3Y: +7.74
+  Vol: 7.55M ($1395.2M)
+
+<b>Caterpillar Inc. (CAT)</b> $765.28
+  <i>Industrials</i>
+  1D: -1.15 | 1W: +3.12 | 🟢 1M: +18.58 | 6M: +88.64 | 1Y: +119.34 | 3Y: +226.26
+  Vol: 1.73M ($1326.9M)
+
+<b>ServiceNow, Inc. (NOW)</b> $106.14
+  <i>Technology</i>
+  1D: -0.88 | 1W: +2.19 | 🔴 1M: -16.63 | 6M: -38.81 | 1Y: -46.37 | 3Y: +14.55
+  Vol: 18.85M ($2001.0M)
+
+<b>Amazon.com, Inc. (AMZN)</b> $200.74
+  <i>Consumer Cyclical</i>
+  1D: +0.98 | 1W: -3.82 | 🔴 1M: -16.05 | 6M: -13.11 | 1Y: -12.86 | 3Y: +104.34
+  Vol: 45.69M ($9172.7M)
 
 <b>Nebius Group N.V. (NBIS)</b> $98.01
-  <b>1D: +9.23%</b> | <b>1W: +13.83%</b> | 1M: -5.66% | 6M: +43.16% | 1Y: +149.39% | 3Y: +390.05%
+  <i>Communication Services</i>
+  🟢 1D: +9.23 | 🟢 1W: +13.83 | 1M: -5.66 | 6M: +43.16 | 1Y: +149.39 | 3Y: +390.05
   Vol: 20.50M ($2009.0M)
 
-<b>Netflix, Inc. (NFLX)</b> $76.87
-  1D: +1.33% | <b>1W: -6.48%</b> | <b>1M: -12.70%</b> | 6M: -37.53% | 1Y: -25.17% | 3Y: +109.55%
-  Vol: 42.23M ($3246.1M)
+<b>Microsoft Corporation (MSFT)</b> $397.67
+  <i>Technology</i>
+  1D: -0.91 | 1W: -3.85 | 🔴 1M: -13.52 | 6M: -23.28 | 1Y: -2.42 | 3Y: +54.45
+  Vol: 16.59M ($6596.3M)
+
+🟡 <b>Danaher Corporation (DHR)</b> $204.84
+  <i>Healthcare</i>
+  🔴 1D: -3.64 | 🔴 1W: -5.46 | 🔴 1M: -13.20 | 6M: -2.58 | 1Y: +1.24 | 3Y: -8.05
+  Vol: 4.93M ($1010.5M)
+
+<b>Exxon Mobil Corporation (XOM)</b> $145.99
+  <i>Energy</i>
+  1D: -1.66 | 1W: -2.81 | 🟢 1M: +13.14 | 6M: +39.21 | 1Y: +39.65 | 3Y: +42.49
+  Vol: 9.59M ($1400.0M)
+
+<b>Netflix, Inc. (NFLX)</b> $76.79
+  <i>Communication Services</i>
+  1D: -0.11 | 🔴 1W: -5.75 | 🔴 1M: -12.74 | 6M: -38.02 | 1Y: -26.43 | 3Y: +111.82
+  Vol: 23.92M ($1836.6M)
+
+<b>Palo Alto Networks, Inc. (PANW)</b> $164.27
+  <i>Technology</i>
+  1D: -1.61 | 1W: -1.04 | 🔴 1M: -12.46 | 6M: -7.24 | 1Y: -18.63 | 3Y: +97.76
+  Vol: 6.48M ($1065.2M)
+
+<b>Advanced Micro Devices, Inc. (AMD)</b> $203.62
+  <i>Technology</i>
+  1D: -1.79 | 🔴 1W: -5.73 | 🔴 1M: -12.17 | 6M: +14.71 | 1Y: +82.11 | 3Y: +144.70
+  Vol: 22.75M ($4631.8M)
+
+<b>Johnson &amp; Johnson (JNJ)</b> $243.26
+  <i>Healthcare</i>
+  1D: -0.08 | 1W: +1.93 | 🟢 1M: +11.25 | 6M: +39.60 | 1Y: +59.43 | 3Y: +65.11
+  Vol: 4.29M ($1042.4M)
+
+<b>The Procter &amp; Gamble Company (PG)</b> $159.57
+  <i>Consumer Defensive</i>
+  1D: -0.31 | 1W: +1.42 | 🟢 1M: +11.19 | 6M: +4.84 | 1Y: -4.13 | 3Y: +25.70
+  Vol: 6.63M ($1057.4M)
+
+<b>Micron Technology, Inc. (MU)</b> $403.17
+  <i>Technology</i>
+  1D: -2.06 | 🟢 1W: +5.13 | 🟢 1M: +11.14 | 6M: +233.90 | 1Y: +322.84 | 3Y: +579.68
+  Vol: 18.79M ($7576.8M)
+
+<b>Applied Materials, Inc. (AMAT)</b> $359.67
+  <i>Technology</i>
+  1D: +1.34 | 🟢 1W: +8.80 | 1M: +9.99 | 6M: +123.42 | 1Y: +97.14 | 3Y: +218.32
+  Vol: 4.21M ($1512.7M)
+
+<b>Intel Corporation (INTC)</b> $46.63
+  <i>Technology</i>
+  1D: -0.33 | 🔴 1W: -7.18 | 1M: -0.69 | 6M: +89.88 | 1Y: +93.27 | 3Y: +72.31
+  Vol: 43.72M ($2038.6M)
+
+<b>Alphabet Inc. (GOOGL)</b> $302.52
+  <i>Communication Services</i>
+  1D: -1.05 | 🔴 1W: -6.72 | 1M: -8.33 | 6M: +48.59 | 1Y: +63.16 | 3Y: +220.81
+  Vol: 26.32M ($7963.0M)
+
+<b>Alphabet Inc. (GOOG)</b> $303.14
+  <i>Communication Services</i>
+  1D: -0.94 | 🔴 1W: -6.55 | 1M: -8.23 | 6M: +48.17 | 1Y: +61.98 | 3Y: +219.94
+  Vol: 14.81M ($4490.3M)
+
+<b>Meta Platforms, Inc. (META)</b> $641.48
+  <i>Communication Services</i>
+  1D: +0.27 | 🔴 1W: -5.28 | 1M: +3.42 | 6M: -18.18 | 1Y: -11.67 | 3Y: +263.06
+  Vol: 6.76M ($4335.5M)
+
+<b>GE Aerospace (GE)</b> $328.36
+  <i>Industrials</i>
+  🟢 1D: +4.10 | 1W: +3.67 | 1M: +1.00 | 6M: +22.88 | 1Y: +58.49 | 3Y: +417.09
+  Vol: 3.07M ($1008.5M)
+
+<b>CrowdStrike Holdings, Inc. (CRWD)</b> $412.21
+  <i>Technology</i>
+  🔴 1D: -4.06 | 1W: +1.02 | 1M: -9.18 | 6M: -3.67 | 1Y: -9.16 | 3Y: +263.44
+  Vol: 2.80M ($1154.2M)
+
+<b>CoreWeave, Inc. (CRWV)</b> $92.66
+  <i>Technology</i>
+  🔴 1D: -3.52 | 1W: -4.27 | 1M: -8.47 | 6M: -7.31 | 1Y: +131.65 | 3Y: +131.65
+  Vol: 11.50M ($1065.8M)
+
+<b>Walmart Inc. (WMT)</b> $129.47
+  <i>Consumer Defensive</i>
+  🔴 1D: -3.30 | 1W: +0.35 | 1M: +8.16 | 6M: +29.73 | 1Y: +24.43 | 3Y: +184.68
+  Vol: 19.56M ($2532.5M)
+
+<b>Apple Inc. (AAPL)</b> $263.86
+  <i>Technology</i>
+  🟢 1D: +3.16 | 1W: -3.92 | 1M: +3.36 | 6M: +14.15 | 1Y: +9.72 | 3Y: +77.70
+  Vol: 25.38M ($6696.0M)
 
 
-  <b>▸ Consumer Cyclical</b>
-<b>Amazon.com, Inc. (AMZN)</b> $198.79
-  1D: -0.41% | <b>1W: -5.48%</b> | <b>1M: -16.54%</b> | 6M: -13.94% | 1Y: -13.17% | 3Y: +98.69%
-  Vol: 66.22M ($13163.0M)
+<b>⭐ Rising Stars</b>
+<b>Corning Incorporated (GLW)</b> $133.31
+  <i>Rising Stars</i>
+  1D: -0.11 | 1W: +1.46 | 🟢 1M: +41.52 | 6M: +105.24 | 1Y: +160.69 | 3Y: +313.92
+  Vol: 5.18M ($691.1M)
 
-<b>NIKE, Inc. (NKE)</b> $63.13
-  <b>1D: +3.32%</b> | 1W: -1.24% | 1M: -2.26% | 6M: -16.40% | 1Y: -10.58% | 3Y: -45.84%
-  Vol: 20.18M ($1273.8M)
+<b>Pinterest, Inc. (PINS)</b> $15.50
+  <i>Rising Stars</i>
+  1D: +0.51 | 🔴 1W: -23.04 | 🔴 1M: -40.18 | 6M: -56.68 | 1Y: -60.35 | 3Y: -37.33
+  Vol: 16.20M ($251.1M)
 
-<b>Rivian Automotive, Inc. (RIVN)</b> $17.73
-  <b>1D: +26.64%</b> | <b>1W: +19.80%</b> | 1M: +3.93% | 6M: +47.01% | 1Y: +42.07% | 3Y: -11.70%
-  Vol: 127.68M ($2263.7M)
+<b>Reddit, Inc. (RDDT)</b> $143.00
+  <i>Rising Stars</i>
+  1D: +2.40 | 1W: +0.89 | 🔴 1M: -38.10 | 6M: -41.99 | 1Y: -30.23 | 3Y: +183.50
+  Vol: 3.41M ($487.4M)
 
+🟡 <b>Vertiv Holdings Co (VRT)</b> $244.16
+  <i>Rising Stars</i>
+  🟢 1D: +4.11 | 🟢 1W: +20.87 | 🟢 1M: +38.00 | 6M: +83.60 | 1Y: +123.74 | 3Y: +1465.09
+  Vol: 3.91M ($955.7M)
 
-  <b>▸ Consumer Defensive</b>
-<b>The Coca-Cola Company (KO)</b> $78.68
-  1D: -0.41% | 1W: -0.44% | <b>1M: +11.63%</b> | 6M: +14.80% | 1Y: +17.89% | 3Y: +44.19%
-  Vol: 16.71M ($1314.8M)
+🟡 <b>D-Wave Quantum Inc. (QBTS)</b> $18.85
+  <i>Rising Stars</i>
+  🔴 1D: -4.17 | 🔴 1W: -11.13 | 🔴 1M: -34.62 | 6M: +10.82 | 1Y: +190.00 | 3Y: +1629.36
+  Vol: 16.81M ($316.8M)
 
-<b>The Procter & Gamble Company (PG)</b> $160.07
-  1D: -0.71% | 1W: +0.57% | <b>1M: +11.46%</b> | 6M: +5.59% | 1Y: -3.02% | 3Y: +24.71%
-  Vol: 14.00M ($2240.8M)
+<b>Flutter Entertainment plc (FLUT)</b> $124.56
+  <i>Rising Stars</i>
+  1D: -0.49 | 🔴 1W: -19.38 | 🔴 1M: -33.91 | 6M: -57.53 | 1Y: -55.86 | 3Y: -17.78
+  Vol: 2.19M ($273.1M)
 
-<b>Walmart Inc. (WMT)</b> $133.89
-  1D: +0.19% | 1W: +2.07% | <b>1M: +12.32%</b> | 6M: +33.34% | 1Y: +30.46% | 3Y: +197.13%
-  Vol: 24.12M ($3230.0M)
+🟡 <b>Astera Labs, Inc. (ALAB)</b> $124.31
+  <i>Rising Stars</i>
+  🔴 1D: -3.87 | 🔴 1W: -33.76 | 🔴 1M: -31.70 | 6M: -33.11 | 1Y: +40.96 | 3Y: +100.40
+  Vol: 5.13M ($637.7M)
 
+<b>IonQ, Inc. (IONQ)</b> $33.81
+  <i>Rising Stars</i>
+  1D: -0.86 | 1W: -4.69 | 🔴 1M: -33.44 | 6M: -15.95 | 1Y: -12.51 | 3Y: +621.00
+  Vol: 9.11M ($308.0M)
 
-  <b>▸ Energy</b>
-<b>Exxon Mobil Corporation (XOM)</b> $148.45
-  1D: -0.99% | 1W: +0.26% | <b>1M: +15.73%</b> | 6M: +41.69% | 1Y: +43.04% | 3Y: +45.43%
-  Vol: 20.15M ($2992.0M)
+<b>Tri Pointe Homes, Inc. (TPH)</b> $46.26
+  <i>Rising Stars</i>
+  1D: -0.23 | 🟢 1W: +31.96 | 🟢 1M: +31.47 | 6M: +32.53 | 1Y: +28.59 | 3Y: +108.21
+  Vol: 6.67M ($308.8M)
 
+🟡 <b>ZIM Integrated Shipping Services Ltd. (ZIM)</b> $27.97
+  <i>Rising Stars</i>
+  🟢 1D: +25.99 | 🟢 1W: +31.81 | 🟢 1M: +30.95 | 6M: +71.49 | 1Y: +80.53 | 3Y: +172.53
+  Vol: 33.02M ($923.5M)
 
-  <b>▸ Financial Services</b>
-<b>Affirm Holdings, Inc. (AFRM)</b> $49.81
-  1D: +0.10% | <b>1W: -12.66%</b> | <b>1M: -30.64%</b> | 6M: -35.33% | 1Y: -34.17% | 3Y: +210.92%
-  Vol: 10.25M ($510.6M)
+<b>NuScale Power Corporation (SMR)</b> $14.28
+  <i>Rising Stars</i>
+  1D: -0.21 | 🔴 1W: -19.23 | 🔴 1M: -29.27 | 6M: -59.74 | 1Y: -42.21 | 3Y: +39.73
+  Vol: 18.33M ($261.8M)
 
-<b>Bank of America Corporation (BAC)</b> $52.55
-  1D: +0.06% | <b>1W: -7.04%</b> | 1M: -0.08% | 6M: +11.33% | 1Y: +16.35% | 3Y: +55.76%
-  Vol: 31.77M ($1669.5M)
+<b>Roblox Corporation (RBLX)</b> $63.54
+  <i>Rising Stars</i>
+  1D: +0.59 | 🔴 1W: -13.49 | 🔴 1M: -27.20 | 6M: -45.85 | 1Y: -3.04 | 3Y: +74.56
+  Vol: 4.64M ($295.1M)
 
-<b>Coinbase Global, Inc. (COIN)</b> $164.32
-  <b>1D: +16.46%</b> | 1W: -0.48% | <b>1M: -31.33%</b> | 6M: -49.42% | 1Y: -40.23% | 3Y: +136.64%
-  Vol: 32.35M ($5315.7M)
+<b>Southwest Airlines Co. (LUV)</b> $54.75
+  <i>Rising Stars</i>
+  🟢 1D: +7.12 | 1W: +2.60 | 🟢 1M: +26.97 | 6M: +75.55 | 1Y: +86.92 | 3Y: +67.99
+  Vol: 7.04M ($385.3M)
 
-<b>Robinhood Markets, Inc. (HOOD)</b> $75.97
-  <b>1D: +6.82%</b> | <b>1W: -8.27%</b> | <b>1M: -31.16%</b> | 6M: -31.38% | 1Y: +35.88% | 3Y: +625.60%
-  Vol: 43.42M ($3298.5M)
+<b>AST SpaceMobile, Inc. (ASTS)</b> $84.59
+  <i>Rising Stars</i>
+  1D: +2.52 | 🔴 1W: -17.17 | 🔴 1M: -26.93 | 6M: +75.94 | 1Y: +181.50 | 3Y: +1321.68
+  Vol: 6.22M ($526.3M)
 
-<b>SoFi Technologies, Inc. (SOFI)</b> $19.61
-  1D: +1.61% | <b>1W: -5.99%</b> | <b>1M: -25.83%</b> | 6M: -15.80% | 1Y: +32.77% | 3Y: +172.36%
-  Vol: 43.00M ($843.2M)
+<b>Verizon Communications Inc. (VZ)</b> $49.01
+  <i>Rising Stars</i>
+  1D: +0.01 | 1W: +4.24 | 🟢 1M: +25.97 | 6M: +14.65 | 1Y: +27.61 | 3Y: +50.92
+  Vol: 12.68M ($621.4M)
 
-<b>Visa Inc. (V)</b> $314.08
-  <b>1D: -3.12%</b> | <b>1W: -5.08%</b> | 1M: -3.97% | 6M: -8.72% | 1Y: -9.97% | 3Y: +39.84%
-  Vol: 11.65M ($3659.2M)
+<b>Ciena Corporation (CIEN)</b> $304.58
+  <i>Rising Stars</i>
+  1D: +0.22 | 1W: +5.14 | 🟢 1M: +25.13 | 6M: +235.18 | 1Y: +242.80 | 3Y: +525.29
+  Vol: 1.14M ($346.7M)
 
+<b>S&amp;P Global Inc. (SPGI)</b> $412.00
+  <i>Rising Stars</i>
+  1D: +0.60 | 1W: -7.25 | 🔴 1M: -24.59 | 6M: -25.69 | 1Y: -23.47 | 3Y: +16.14
+  Vol: 2.34M ($963.0M)
 
-  <b>▸ Healthcare</b>
-<b>Johnson & Johnson (JNJ)</b> $243.45
-  1D: -0.45% | 1W: +1.44% | <b>1M: +10.88%</b> | 6M: +41.25% | 1Y: +61.60% | 3Y: +63.01%
-  Vol: 13.27M ($3229.4M)
+🟡 <b>UiPath, Inc. (PATH)</b> $10.92
+  <i>Rising Stars</i>
+  🔴 1D: -3.53 | 🔴 1W: -16.00 | 🔴 1M: -23.85 | 6M: -0.36 | 1Y: -27.87 | 3Y: -30.67
+  Vol: 25.56M ($279.2M)
 
-<b>UnitedHealth Group Incorporated (UNH)</b> $293.19
-  <b>1D: +3.10%</b> | <b>1W: +5.98%</b> | <b>1M: -13.50%</b> | 6M: +9.40% | 1Y: -43.04% | 3Y: -35.91%
-  Vol: 10.27M ($3010.4M)
+<b>Ares Management Corporation (ARES)</b> $130.79
+  <i>Rising Stars</i>
+  1D: -2.31 | 1W: -4.71 | 🔴 1M: -22.93 | 6M: -29.46 | 1Y: -27.11 | 3Y: +70.80
+  Vol: 1.98M ($259.0M)
 
+<b>AT&amp;T Inc. (T)</b> $28.79
+  <i>Rising Stars</i>
+  1D: +0.35 | 1W: +6.20 | 🟢 1M: +22.56 | 6M: +1.98 | 1Y: +17.25 | 3Y: +79.21
+  Vol: 13.33M ($383.8M)
 
-  <b>▸ Technology</b>
-<b>Apple Inc. (AAPL)</b> $255.78
-  1D: -2.27% | <b>1W: -7.95%</b> | 1M: -0.85% | 6M: +10.09% | 1Y: +8.45% | 3Y: +71.06%
-  Vol: 56.23M ($14382.5M)
+<b>KKR &amp; Co. Inc. (KKR)</b> $102.16
+  <i>Rising Stars</i>
+  1D: +0.42 | 1W: -4.78 | 🔴 1M: -22.26 | 6M: -28.09 | 1Y: -26.25 | 3Y: +81.19
+  Vol: 2.94M ($300.3M)
 
-<b>Cisco Systems, Inc. (CSCO)</b> $76.85
-  1D: +2.47% | <b>1W: -9.40%</b> | 1M: +2.13% | 6M: +12.16% | 1Y: +25.89% | 3Y: +78.18%
-  Vol: 42.87M ($3294.8M)
+<b>Block, Inc. (XYZ)</b> $51.29
+  <i>Rising Stars</i>
+  1D: +2.99 | 1W: -9.67 | 🔴 1M: -22.23 | 6M: -32.34 | 1Y: -39.15 | 3Y: -32.67
+  Vol: 5.33M ($273.5M)
 
-<b>Cognizant Technology Solutions Corporation (CTSH)</b> $66.55
-  1D: +1.09% | <b>1W: -13.66%</b> | <b>1M: -21.54%</b> | 6M: -3.22% | 1Y: -23.22% | 3Y: +5.46%
-  Vol: 13.05M ($868.8M)
+<b>Carvana Co. (CVNA)</b> $345.23
+  <i>Rising Stars</i>
+  1D: +0.69 | 🔴 1W: -16.13 | 🔴 1M: -22.09 | 6M: -1.36 | 1Y: +26.74 | 3Y: +2788.95
+  Vol: 1.85M ($637.6M)
 
-<b>CoreWeave, Inc. (CRWV)</b> $96.04
-  1D: +0.36% | <b>1W: +6.77%</b> | 1M: +1.08% | 6M: -3.48% | 1Y: +140.10% | 3Y: +140.10%
-  Vol: 23.10M ($2218.6M)
+<b>Comfort Systems USA, Inc. (FIX)</b> $1362.03
+  <i>Rising Stars</i>
+  1D: +1.80 | 1W: +6.11 | 🟢 1M: +21.61 | 6M: +100.17 | 1Y: +246.00 | 3Y: +1060.36
+  Vol: 0.21M ($291.8M)
 
-<b>Intel Corporation (INTC)</b> $46.79
-  1D: +0.67% | <b>1W: -7.51%</b> | 1M: -3.17% | 6M: +96.10% | 1Y: +108.14% | 3Y: +69.76%
-  Vol: 69.58M ($3255.8M)
+<b>Moody&#x27;s Corporation (MCO)</b> $424.67
+  <i>Rising Stars</i>
+  1D: -0.42 | 1W: -5.52 | 🔴 1M: -21.20 | 6M: -17.61 | 1Y: -18.88 | 3Y: +41.84
+  Vol: 0.97M ($413.2M)
 
-<b>Microsoft Corporation (MSFT)</b> $401.32
-  1D: -0.13% | 1W: +0.04% | <b>1M: -12.12%</b> | 6M: -22.92% | 1Y: -1.16% | 3Y: +54.06%
-  Vol: 34.04M ($13661.4M)
+<b>HubSpot, Inc. (HUBS)</b> $247.08
+  <i>Rising Stars</i>
+  1D: +1.32 | 1W: +6.92 | 🔴 1M: -20.78 | 6M: -43.76 | 1Y: -69.86 | 3Y: -31.11
+  Vol: 1.34M ($330.7M)
 
-<b>Palantir Technologies Inc. (PLTR)</b> $131.41
-  1D: +1.77% | 1W: -3.30% | <b>1M: -25.79%</b> | 6M: -27.41% | 1Y: +11.94% | 3Y: +1498.66%
-  Vol: 49.31M ($6480.4M)
+<b>Circle Internet Group (CRCL)</b> $62.56
+  <i>Rising Stars</i>
+  🟢 1D: +4.20 | 1W: +4.09 | 🔴 1M: -20.42 | 6M: -58.09 | 1Y: -24.83 | 3Y: -24.83
+  Vol: 5.66M ($353.9M)
 
-<b>QUALCOMM Incorporated (QCOM)</b> $140.70
-  1D: +1.61% | 1W: +2.45% | <b>1M: -12.82%</b> | 6M: -10.04% | 1Y: -15.53% | 3Y: +13.95%
-  Vol: 13.13M ($1847.8M)
+<b>Novo Nordisk A/S (NVO)</b> $49.63
+  <i>Rising Stars</i>
+  1D: +0.12 | 1W: +0.53 | 🔴 1M: -20.38 | 6M: -4.24 | 1Y: -35.31 | 3Y: -25.15
+  Vol: 6.44M ($319.7M)
 
-<b>Toast, Inc. (TOST)</b> $27.33
-  <b>1D: +4.55%</b> | 1W: -1.44% | <b>1M: -19.05%</b> | 6M: -36.44% | 1Y: -31.25% | 3Y: +16.60%
-  Vol: 33.95M ($927.8M)
+<b>CBRE Group, Inc. (CBRE)</b> $141.67
+  <i>Rising Stars</i>
+  1D: -0.45 | 🔴 1W: -17.14 | 1M: -17.44 | 6M: -10.86 | 1Y: -1.02 | 3Y: +61.61
+  Vol: 2.05M ($290.1M)
 
+<b>Genuine Parts Company (GPC)</b> $126.63
+  <i>Rising Stars</i>
+  🔴 1D: -13.95 | 🔴 1W: -13.28 | 1M: -7.53 | 6M: -6.69 | 1Y: +4.83 | 3Y: -18.46
+  Vol: 2.01M ($255.1M)
 
-<b>🪙 Crypto</b>
-<b>Bitcoin (BTC-USD)</b> $69806.31
-  1D: +1.38% | 1W: -0.45% | <b>1M: -19.37%</b> | 6M: -37.00% | 1Y: -33.91% | 3Y: +67.54%
-  Vol: 36715.46M ($2562970968.0M)
+<b>Vistra Corp. (VST)</b> $174.09
+  <i>Rising Stars</i>
+  1D: +1.52 | 🟢 1W: +13.81 | 1M: +4.50 | 6M: -11.56 | 1Y: +5.67 | 3Y: +701.30
+  Vol: 3.02M ($526.4M)
 
-<b>Ethereum (ETH-USD)</b> $2084.05
-  1D: +1.73% | 1W: -0.93% | <b>1M: -25.99%</b> | 6M: -44.43% | 1Y: -17.51% | 3Y: -15.61%
-  Vol: 17020.15M ($35470843.1M)
+<b>Akamai Technologies, Inc. (AKAM)</b> $107.74
+  <i>Rising Stars</i>
+  🔴 1D: -3.60 | 🟢 1W: +13.75 | 1M: +15.24 | 6M: +44.77 | 1Y: +8.11 | 3Y: +25.70
+  Vol: 2.51M ($270.4M)
+
+<b>Spotify Technology S.A. (SPOT)</b> $470.39
+  <i>Rising Stars</i>
+  1D: +2.63 | 🟢 1W: +13.39 | 1M: -6.76 | 6M: -35.81 | 1Y: -27.44 | 3Y: +289.30
+  Vol: 1.91M ($896.8M)
+
+<b>Norwegian Cruise Line Holdings Ltd. (NCLH)</b> $24.19
+  <i>Rising Stars</i>
+  🟢 1D: +12.59 | 1W: +5.89 | 1M: +9.93 | 6M: -0.43 | 1Y: -8.11 | 3Y: +43.00
+  Vol: 39.47M ($954.7M)
+
+<b>Howmet Aerospace Inc. (HWM)</b> $252.90
+  <i>Rising Stars</i>
+  1D: +1.07 | 🟢 1W: +12.32 | 1M: +12.52 | 6M: +47.85 | 1Y: +97.94 | 3Y: +530.88
+  Vol: 1.56M ($393.5M)
+
+<b>The Charles Schwab Corporation (SCHW)</b> $93.84
+  <i>Rising Stars</i>
+  1D: +0.13 | 🔴 1W: -12.18 | 1M: -9.31 | 6M: -1.75 | 1Y: +16.84 | 3Y: +23.21
+  Vol: 5.46M ($512.3M)
+
+<b>AstraZeneca PLC (AZN)</b> $210.71
+  <i>Rising Stars</i>
+  1D: +2.51 | 🟢 1W: +12.07 | 1M: +10.24 | 6M: +35.50 | 1Y: +44.56 | 3Y: +64.87
+  Vol: 1.36M ($286.8M)
+
+<b>International Business Machines Corporation (IBM)</b> $259.10
+  <i>Rising Stars</i>
+  1D: -1.25 | 🔴 1W: -12.07 | 1M: -14.75 | 6M: +9.30 | 1Y: +2.45 | 3Y: +114.73
+  Vol: 2.71M ($703.2M)
+
+<b>American Tower Corporation (AMT)</b> $192.35
+  <i>Rising Stars</i>
+  1D: +0.13 | 🟢 1W: +10.73 | 1M: +4.78 | 6M: -4.94 | 1Y: +4.79 | 3Y: -1.08
+  Vol: 1.47M ($283.5M)
+
+<b>Cloudflare, Inc. (NET)</b> $192.00
+  <i>Rising Stars</i>
+  1D: -1.97 | 🟢 1W: +10.50 | 1M: +4.25 | 6M: -4.43 | 1Y: +8.78 | 3Y: +230.07
+  Vol: 3.81M ($731.3M)
+
+<b>Motorola Solutions, Inc. (MSI)</b> $465.44
+  <i>Rising Stars</i>
+  1D: +0.80 | 🟢 1W: +10.14 | 1M: +16.18 | 6M: +1.68 | 1Y: +0.96 | 3Y: +87.18
+  Vol: 0.71M ($329.9M)
+
+<b>General Mills, Inc. (GIS)</b> $44.49
+  <i>Rising Stars</i>
+  🔴 1D: -7.95 | 1W: -7.49 | 1M: -0.03 | 6M: -7.98 | 1Y: -21.53 | 3Y: -33.45
+  Vol: 15.82M ($703.7M)
+
+<b>Vulcan Materials Company (VMC)</b> $309.40
+  <i>Rising Stars</i>
+  🔴 1D: -5.57 | 1W: -5.47 | 1M: +1.12 | 6M: +6.28 | 1Y: +15.73 | 3Y: +71.06
+  Vol: 1.23M ($381.1M)
+
+<b>First Majestic Silver Corp. (AG)</b> $21.73
+  <i>Rising Stars</i>
+  🔴 1D: -5.36 | 1W: -8.51 | 1M: +1.07 | 6M: +145.54 | 1Y: +281.99 | 3Y: +197.07
+  Vol: 13.47M ($292.6M)
+
+<b>Vale S.A. (VALE)</b> $15.77
+  <i>Rising Stars</i>
+  🔴 1D: -5.30 | 1W: -6.09 | 1M: +7.92 | 6M: +58.95 | 1Y: +77.04 | 3Y: +20.09
+  Vol: 42.68M ($673.1M)
+
+<b>Southern Copper Corporation (SCCO)</b> $188.12
+  <i>Rising Stars</i>
+  🔴 1D: -4.99 | 1W: -8.52 | 1M: +5.30 | 6M: +101.64 | 1Y: +104.61 | 3Y: +194.84
+  Vol: 1.34M ($251.4M)
+
+<b>Enbridge Inc. (ENB)</b> $51.43
+  <i>Rising Stars</i>
+  🔴 1D: -4.55 | 1W: +1.58 | 1M: +8.07 | 6M: +9.33 | 1Y: +18.29 | 3Y: +57.43
+  Vol: 5.69M ($292.9M)
+
+<b>American Airlines Group Inc. (AAL)</b> $14.47
+  <i>Rising Stars</i>
+  🟢 1D: +4.21 | 1W: -3.50 | 1M: -5.89 | 6M: +9.83 | 1Y: -8.10 | 3Y: -13.18
+  Vol: 25.85M ($374.1M)
+
+<b>Alcoa Corporation (AA)</b> $57.43
+  <i>Rising Stars</i>
+  🔴 1D: -4.20 | 1W: -7.91 | 1M: -4.39 | 6M: +84.15 | 1Y: +59.88 | 3Y: +19.08
+  Vol: 5.11M ($293.5M)
+
+<b>Carnival Corporation &amp; plc (CCL)</b> $33.08
+  <i>Rising Stars</i>
+  🟢 1D: +4.11 | 1W: +1.27 | 1M: +14.90 | 6M: +11.65 | 1Y: +28.49 | 3Y: +188.19
+  Vol: 10.81M ($357.4M)
+
+<b>Airbnb, Inc. (ABNB)</b> $126.33
+  <i>Rising Stars</i>
+  🟢 1D: +4.11 | 1W: +4.14 | 1M: -3.31 | 6M: +0.99 | 1Y: -10.43 | 3Y: +9.91
+  Vol: 4.01M ($506.8M)
+
+<b>Twilio Inc. (TWLO)</b> $108.42
+  <i>Rising Stars</i>
+  🔴 1D: -4.06 | 1W: -7.32 | 1M: -8.95 | 6M: +2.60 | 1Y: -26.39 | 3Y: +76.83
+  Vol: 2.40M ($260.7M)
+
+<b>Chipotle Mexican Grill, Inc. (CMG)</b> $37.76
+  <i>Rising Stars</i>
+  🟢 1D: +4.01 | 1W: -4.64 | 1M: -5.52 | 6M: -14.27 | 1Y: -35.05 | 3Y: +17.48
+  Vol: 9.97M ($376.6M)
+
+<b>Hecla Mining Company (HL)</b> $21.75
+  <i>Rising Stars</i>
+  🔴 1D: -3.76 | 1W: -9.15 | 1M: -18.05 | 6M: +183.80 | 1Y: +242.25 | 3Y: +289.01
+  Vol: 15.83M ($344.3M)
+
+<b>Snowflake Inc. (SNOW)</b> $175.89
+  <i>Rising Stars</i>
+  🔴 1D: -3.51 | 1W: -0.03 | 1M: -16.39 | 6M: -11.65 | 1Y: -8.70 | 3Y: +8.12
+  Vol: 3.69M ($649.5M)
+
+<b>Arthur J. Gallagher &amp; Co. (AJG)</b> $214.81
+  <i>Rising Stars</i>
+  🟢 1D: +3.05 | 1W: -1.37 | 1M: -16.91 | 6M: -26.26 | 1Y: -34.05 | 3Y: +14.25
+  Vol: 1.84M ($395.1M)
+
+<b>Constellation Brands, Inc. (STZ)</b> $153.84
+  <i>Rising Stars</i>
+  🟢 1D: +3.04 | 1W: -5.97 | 1M: -1.15 | 6M: -7.24 | 1Y: -3.29 | 3Y: -28.10
+  Vol: 1.77M ($272.3M)
+
+<b>Bloom Energy Corporation (BE)</b> $143.94
+  <i>Rising Stars</i>
+  🟢 1D: +3.01 | 1W: -7.24 | 1M: -3.72 | 6M: +217.89 | 1Y: +482.52 | 3Y: +508.88
+  Vol: 4.72M ($679.6M)

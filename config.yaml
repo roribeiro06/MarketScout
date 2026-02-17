@@ -1,10 +1,19 @@
-# Core thresholds (can be tweaked without changing code)
+# Core thresholds (can be tweaked without changing code) — big stocks
 thresholds:
   one_day_pct_abs: 3.0      # abs(1-day % change) >= 3%
   one_week_pct_abs: 5.0     # abs(1-week % change) >= 5%
   one_month_pct_abs: 10.0   # abs(1-month % change) >= 10%
   min_dollar_volume: 1000000000   # price * volume >= $1B
   min_price: 10.0           # >= $10 per share
+
+# Rising stars: 500M–1B dollar volume, bigger % moves
+rising_stars_thresholds:
+  one_day_pct_abs: 3.0      # 1D +/-3%
+  one_week_pct_abs: 10.0    # 1W +/-10%
+  one_month_pct_abs: 20.0   # 1M +/-20%
+  min_dollar_volume: 500000000     # price * volume >= $500M
+  max_dollar_volume: 1000000000   # price * volume <= $1B
+  min_price: 10.0
 
 # Exchanges to scan
 exchanges:

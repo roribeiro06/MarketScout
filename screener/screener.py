@@ -148,12 +148,21 @@ def calculate_percent_change(data: pd.DataFrame, days: int) -> Optional[float]:
     return pct_change
 
 
-def screen_stock(symbol: str, config: Dict) -> Optional[Dict]:
+def screen_stock(
+    symbol: str,
+    config: Dict,
+    thresholds_override: Optional[Dict] = None,
+    max_dollar_volume: Optional[float] = None,
+    override_sector: Optional[str] = None,
+) -> Optional[Dict]:
     """
     Screen a single stock against thresholds.
     Returns dict with stock info if it passes screening, None otherwise.
+    Optional: thresholds_override (e.g. rising_stars_thresholds), max_dollar_volume for band filter, override_sector (e.g. "Rising Stars").
     """
-    thresholds = config["thresholds"]
+    thresholds = config.get("thresholds") or {}
+    if thresholds_override is not None:
+        thresholds = {**thresholds, **thresholds_override}
     
     # Fetch data (5y so we have 6M/1Y/3Y % for reference)
     data = fetch_stock_data(symbol, period="5y")
@@ -177,32 +186,50 @@ def screen_stock(symbol: str, config: Dict) -> Optional[Dict]:
     current_price = data["Close"].iloc[-1]
     dollar_volume = current_price * current_volume
     
-    # Check thresholds (stocks: price*volume >= $1B, price >= $10)
-    passes_day = abs(one_day_change) >= thresholds["one_day_pct_abs"]
-    passes_week = abs(one_week_change) >= thresholds["one_week_pct_abs"]
-    passes_month = one_month_change is not None and abs(one_month_change) >= thresholds["one_month_pct_abs"]
-    passes_volume = dollar_volume >= thresholds.get("min_dollar_volume", 1_000_000_000)
+    # Check thresholds (stocks: price*volume >= min, optionally <= max; price >= min_price)
+    passes_day = abs(one_day_change) >= thresholds.get("one_day_pct_abs", 3.0)
+    passes_week = abs(one_week_change) >= thresholds.get("one_week_pct_abs", 5.0)
+    passes_month = one_month_change is not None and abs(one_month_change) >= thresholds.get("one_month_pct_abs", 10.0)
+    min_dv = thresholds.get("min_dollar_volume", 1_000_000_000)
+    passes_volume = dollar_volume >= min_dv
+    if max_dollar_volume is not None:
+        passes_volume = passes_volume and (dollar_volume <= max_dollar_volume)
     passes_price = current_price >= thresholds.get("min_price", 0)  # Default to 0 if not specified
     
     # Stock passes if it meets any threshold AND volume AND price requirements
     if passes_volume and passes_price and (passes_day or passes_week or passes_month):
         
-        # Fetch company name and sector
-        company_name = symbol  # Default to symbol if name fetch fails
-        sector = "Other"
-        try:
-            ticker = yf.Ticker(symbol)
-            info = ticker.info
-            if "longName" in info:
-                company_name = info["longName"]
-            elif "shortName" in info:
-                company_name = info["shortName"]
-            if info.get("sector") and isinstance(info["sector"], str):
-                sector = info["sector"].strip() or "Other"
-        except Exception:
-            pass  # Use symbol as fallback
-        
-        return {
+        # Fetch company name and sector (use override_sector for rising stars; display_sector = real sector for display)
+        company_name = symbol
+        sector = override_sector if override_sector is not None else "Other"
+        display_sector = None
+        if override_sector is None:
+            try:
+                ticker = yf.Ticker(symbol)
+                info = ticker.info
+                if "longName" in info:
+                    company_name = info["longName"]
+                elif "shortName" in info:
+                    company_name = info["shortName"]
+                if info.get("sector") and isinstance(info["sector"], str):
+                    sector = info["sector"].strip() or "Other"
+            except Exception:
+                pass  # Use symbol as fallback
+        else:
+            display_sector = None
+            try:
+                ticker = yf.Ticker(symbol)
+                info = ticker.info
+                if "longName" in info:
+                    company_name = info["longName"]
+                elif "shortName" in info:
+                    company_name = info["shortName"]
+                if info.get("sector") and isinstance(info["sector"], str):
+                    display_sector = info["sector"].strip() or None
+            except Exception:
+                pass
+
+        out = {
             "symbol": symbol,
             "company_name": company_name,
             "sector": sector,
@@ -217,33 +244,77 @@ def screen_stock(symbol: str, config: Dict) -> Optional[Dict]:
             "passes_day": passes_day,
             "passes_week": passes_week,
             "passes_month": passes_month,
-            "data": data,  # Include data for chart generation
+            "data": data,
         }
-    
+        if display_sector is not None:
+            out["display_sector"] = display_sector
+        return out
+
     return None
 
 
-def run_screener(config: Dict) -> List[Dict]:
-    """Run the screener across all configured exchanges."""
+def run_screener(config: Dict, symbols_override: Optional[List[str]] = None) -> List[Dict]:
+    """Run the screener across all configured exchanges, or over a given symbol list if provided."""
     all_results = []
-    seen_symbols = set()  # Track symbols we've already processed
+    seen_symbols = set()
     exchanges = config.get("exchanges", [])
-    
-    for exchange in exchanges:
-        print(f"Scanning {exchange}...")
-        symbols = get_exchange_symbols(exchange)
-        
-        for symbol in symbols:
-            # Skip if we've already processed this symbol
-            if symbol in seen_symbols:
-                continue
-            
-            result = screen_stock(symbol, config)
-            if result:
-                all_results.append(result)
-                seen_symbols.add(symbol)  # Mark as processed
-                print(f"  [MATCH] {symbol}: {result['one_day_pct']:.2f}% (1D)")
-    
+
+    if symbols_override is not None:
+        symbols = symbols_override
+        print(f"Scanning {len(symbols)} symbols (override list)...")
+    else:
+        symbols = []
+        for exchange in exchanges:
+            symbols.extend(get_exchange_symbols(exchange))
+        symbols = list(dict.fromkeys(symbols))
+        print(f"Scanning {len(symbols)} symbols...")
+
+    for symbol in symbols:
+        if symbol in seen_symbols:
+            continue
+        result = screen_stock(symbol, config)
+        if result:
+            all_results.append(result)
+            seen_symbols.add(symbol)
+            print(f"  [MATCH] {symbol}: {result['one_day_pct']:.2f}% (1D)")
+
+    return all_results
+
+
+def run_rising_stars_screener(config: Dict, symbols_override: Optional[List[str]] = None) -> List[Dict]:
+    """Run screener for rising stars: 500M–1B dollar volume, 1D 3%, 1W 10%, 1M 20%."""
+    rising = config.get("rising_stars_thresholds")
+    if not rising:
+        return []
+    all_results = []
+    seen_symbols = set()
+    exchanges = config.get("exchanges", [])
+    max_dv = rising.get("max_dollar_volume", 1_000_000_000)
+
+    if symbols_override is not None:
+        symbols = symbols_override
+        print(f"Scanning {len(symbols)} symbols for rising stars (override list)...")
+    else:
+        symbols = []
+        for exchange in exchanges:
+            symbols.extend(get_exchange_symbols(exchange))
+        symbols = list(dict.fromkeys(symbols))
+        print(f"Scanning {len(symbols)} symbols for rising stars...")
+
+    for symbol in symbols:
+        if symbol in seen_symbols:
+            continue
+        result = screen_stock(
+            symbol,
+            config,
+            thresholds_override=rising,
+            max_dollar_volume=max_dv,
+            override_sector="Rising Stars",
+        )
+        if result:
+            all_results.append(result)
+            seen_symbols.add(symbol)
+            print(f"  [RISING] {symbol}: {result['one_day_pct']:.2f}% (1D)")
     return all_results
 
 

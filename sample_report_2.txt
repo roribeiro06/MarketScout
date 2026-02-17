@@ -1,24 +1,33 @@
+🕐 Data as of 2026-02-17 13:44 UTC
+
 📊 <b>MarketScout Scan (2/2)</b>
+
+<b>🪙 Crypto</b>
+<b>Ethereum (ETH-USD)</b> $3450.00
+  <i>Crypto</i>
+  1D: -1.20 | 1W: +3.50 | 🔴 1M: -12.00 | 6M: +15.00 | 1Y: +40.00 | 3Y: +120.00
+
+<b>Bitcoin (BTC-USD)</b> $97500.00
+  <i>Crypto</i>
+  1D: +2.50 | 🔴 1W: -5.00 | 1M: +8.00 | 6M: +20.00 | 1Y: +60.00 | 3Y: +150.00
+
 
 <b>🌾 Commodities</b>
 <b>Natural Gas (NG=F)</b> $3.24
-  1D: +0.81% | <b>1W: -5.23%</b> | 1M: +3.68% | 6M: +14.15% | 1Y: -10.61% | 3Y: +34.84%
-  Vol: 222.3K contracts ($7201.2M)
+  <i>Commodities</i>
+  1D: +0.81 | 🔴 1W: -5.23 | 1M: +3.68 | 6M: +14.15 | 1Y: -10.61 | 3Y: +34.84
+  Vol: 222.3K contracts ($7202.5M)
 
 
 <b>💵 Forex</b>
 <b>US Dollar / Japanese Yen (USDJPY=X)</b> 152.8210
-  1D: -0.29% | <b>1W: -2.53%</b> | <b>1M: -3.64%</b> | 6M: +3.32% | 1Y: +1.06% | 3Y: +14.96%
+  <i>Forex</i>
+  1D: -0.29 | 🔴 1W: -2.53 | 🔴 1M: -3.64 | 6M: +3.32 | 1Y: +1.06 | 3Y: +14.96
 
 
 <b>⚖️ ETFs</b>
   <b>▸ Commodities</b>
 <b>iShares Silver Trust (SLV)</b> $69.72
-  1D: +2.94% | 1W: -0.67% | <b>1M: -16.32%</b> | 6M: +102.09% | 1Y: +137.63% | 3Y: +240.43%
-  Vol: 69.39M ($4837.7M)
-
-
-  <b>▸ Alternatives</b>
-<b>ProShares Bitcoin Strategy (BITO)</b> $9.50
-  <b>1D: +5.09%</b> | 1W: -1.96% | <b>1M: -28.02%</b> | 6M: -43.06% | 1Y: -32.55% | 3Y: +143.92%
-  Vol: 68.75M ($653.1M)
+  <i>Commodities</i>
+  1D: +2.94 | 1W: -0.67 | 🔴 1M: -16.32 | 6M: +102.09 | 1Y: +137.63 | 3Y: +240.43
+  Vol: 69.39M ($4837.9M)
