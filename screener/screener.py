@@ -203,7 +203,7 @@ def screen_stock(
         passes_volume = passes_volume and (dollar_volume <= max_dollar_volume)
     passes_price = current_price >= thresholds.get("min_price", 0)  # Default to 0 if not specified
     
-    # Stock passes if it meets any threshold AND volume AND price requirements
+    # Stock passes if it meets at least one of the three % criteria (1D, 1W, 1M) AND volume AND price
     if passes_volume and passes_price and (passes_day or passes_week or passes_month):
         
         # Fetch company name and sector (use override_sector for rising stars; display_sector = real sector for display)
@@ -221,9 +221,9 @@ def screen_stock(
                     company_name = info["shortName"]
                 if info.get("sector") and isinstance(info["sector"], str):
                     sector = info["sector"].strip() or "Other"
-                t = info.get("targetMeanPrice") or info.get("targetMedianPrice")
+                t = info.get("targetMeanPrice")
                 if t is not None and isinstance(t, (int, float)):
-                    target_price = float(t)
+                    target_price = round(float(t), 2)
             except Exception:
                 pass  # Use symbol as fallback
         else:
@@ -237,9 +237,9 @@ def screen_stock(
                     company_name = info["shortName"]
                 if info.get("sector") and isinstance(info["sector"], str):
                     display_sector = info["sector"].strip() or None
-                t = info.get("targetMeanPrice") or info.get("targetMedianPrice")
+                t = info.get("targetMeanPrice")
                 if t is not None and isinstance(t, (int, float)):
-                    target_price = float(t)
+                    target_price = round(float(t), 2)
             except Exception:
                 pass
 
@@ -601,18 +601,8 @@ def screen_etf(symbol: str, name: str, asset_class: str, config: Dict) -> Option
     
     if not (passes_volume and (passes_day or passes_week or passes_month)):
         return None
-
-    target_price = None
-    try:
-        ticker = yf.Ticker(symbol)
-        info = ticker.info
-        t = info.get("targetMeanPrice") or info.get("targetMedianPrice")
-        if t is not None and isinstance(t, (int, float)):
-            target_price = float(t)
-    except Exception:
-        pass
-
-    out = {
+    
+    return {
         "symbol": symbol,
         "company_name": name,
         "sector": "ETFs",
@@ -630,9 +620,6 @@ def screen_etf(symbol: str, name: str, asset_class: str, config: Dict) -> Option
         "passes_month": passes_month,
         "data": data,
     }
-    if target_price is not None:
-        out["target_price"] = target_price
-    return out
 
 
 def run_etf_screener(config: Dict) -> List[Dict]:

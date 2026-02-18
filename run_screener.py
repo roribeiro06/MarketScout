@@ -308,18 +308,16 @@ def _append_section_block(
         message += f"  <i>{sector_label}</i>\n"
         message += f"  {change_str}\n"
         if is_forex and vol > 0:
-            message += f"  Vol: {vol_shares:.2f}M\n"
+            message += f"  Vol: {vol_shares:.2f}M\n\n"
         elif is_commodity and vol > 0:
             vol_k = vol / 1_000
             contract_size = COMMODITY_CONTRACT_SIZE.get(symbol, 1)
             commodity_dollar_vol = (vol * price * contract_size) / 1_000_000
-            message += f"  Vol: {vol_k:.1f}K contracts (${commodity_dollar_vol:.1f}M)\n"
+            message += f"  Vol: {vol_k:.1f}K contracts (${commodity_dollar_vol:.1f}M)\n\n"
         elif not is_forex and not is_commodity and vol > 0:
-            message += f"  Vol: {vol_shares:.2f}M (${dollar_vol:.1f}M)\n"
-        t = stock.get("target_price")
-        if t is not None:
-            message += f"  1Y target: ${t:.2f}\n"
-        message += "\n"
+            message += f"  Vol: {vol_shares:.2f}M (${dollar_vol:.1f}M)\n\n"
+        else:
+            message += "\n"
     message += "\n"
     return message
 
@@ -355,9 +353,9 @@ def _format_one_stock_block(stocks: list) -> str:
         lines.append(f"  {change_str}")
         if vol > 0:
             lines.append(f"  Vol: {vol_shares:.2f}M (${dollar_vol:.1f}M)")
-        t = stock.get("target_price")
-        if t is not None:
-            lines.append(f"  1Y target: ${t:.2f}")
+        tp = stock.get("target_price")
+        if tp is not None:
+            lines.append(f"  1Y target: ${tp:.2f}")
         lines.append("")
     return "\n".join(lines).strip()
 
@@ -477,9 +475,8 @@ def format_stock_message(
                 msg_rest += f"  <i>{ac_label}</i>\n"
                 msg_rest += f"  {change_str}\n"
                 msg_rest += f"  Vol: {vol_shares:.2f}M (${dollar_vol:.1f}M)\n"
-                t = stock.get("target_price")
-                if t is not None:
-                    msg_rest += f"  1Y target: ${t:.2f}\n"
+                if stock.get("target_price") is not None:
+                    msg_rest += f"  1Y target: ${stock['target_price']:.2f}\n"
                 msg_rest += "\n"
             msg_rest += "\n"
         for ac in sorted(by_asset_class.keys()):
@@ -512,9 +509,8 @@ def format_stock_message(
                 msg_rest += f"  <i>{ac_label}</i>\n"
                 msg_rest += f"  {change_str}\n"
                 msg_rest += f"  Vol: {vol_shares:.2f}M (${dollar_vol:.1f}M)\n"
-                t = stock.get("target_price")
-                if t is not None:
-                    msg_rest += f"  1Y target: ${t:.2f}\n"
+                if stock.get("target_price") is not None:
+                    msg_rest += f"  1Y target: ${stock['target_price']:.2f}\n"
                 msg_rest += "\n"
             msg_rest += "\n"
     if msg_rest.strip():
