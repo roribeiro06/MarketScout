@@ -547,14 +547,8 @@ def main() -> None:
     print("Fetching indices...")
     indices_data = get_indices_snapshot()
 
-    print("Starting MarketScout screener...")
-    if config.get("rising_stars_thresholds"):
-        # Single pass: get both big stocks and rising stars (avoids timeout/rate limits on scheduled runs)
-        results, rising_stars_results = run_screener_and_rising_stars(config, symbols_override=sample_symbols)
-    else:
-        results = run_screener(config, symbols_override=sample_symbols)
-        rising_stars_results = []
-    
+    # Run crypto, forex, commodities, ETFs first (small symbol lists). Then run the long stock scan.
+    # This way message 4 is always populated even if the job times out or gets rate-limited during stocks.
     print("Scanning Crypto...")
     crypto_results = run_crypto_screener(config)
     print("Scanning Forex...")
@@ -563,6 +557,14 @@ def main() -> None:
     commodity_results = run_commodity_screener(config)
     print("Scanning ETFs...")
     etf_results = run_etf_screener(config)
+
+    print("Starting MarketScout stock screener (big + rising stars)...")
+    if config.get("rising_stars_thresholds"):
+        # Single pass: get both big stocks and rising stars (avoids timeout/rate limits on scheduled runs)
+        results, rising_stars_results = run_screener_and_rising_stars(config, symbols_override=sample_symbols)
+    else:
+        results = run_screener(config, symbols_override=sample_symbols)
+        rising_stars_results = []
     
     collection_time = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M %Z")
     all_results = results + rising_stars_results + crypto_results + forex_results + commodity_results + etf_results
