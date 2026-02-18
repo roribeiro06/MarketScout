@@ -186,10 +186,17 @@ def screen_stock(
     current_price = data["Close"].iloc[-1]
     dollar_volume = current_price * current_volume
     
-    # Check thresholds (stocks: price*volume >= min, optionally <= max; price >= min_price)
-    passes_day = abs(one_day_change) >= thresholds.get("one_day_pct_abs", 3.0)
-    passes_week = abs(one_week_change) >= thresholds.get("one_week_pct_abs", 5.0)
-    passes_month = one_month_change is not None and abs(one_month_change) >= thresholds.get("one_month_pct_abs", 10.0)
+    # Check thresholds: symmetric (one_*_pct_abs) or asymmetric (one_*_pct_high / one_*_pct_low)
+    def _passes_pct(pct: Optional[float], high_key: str, low_key: str, abs_key: str) -> bool:
+        if pct is None:
+            return False
+        high, low = thresholds.get(high_key), thresholds.get(low_key)
+        if high is not None and low is not None:
+            return pct >= high or pct <= low
+        return abs(pct) >= thresholds.get(abs_key, 0)
+    passes_day = _passes_pct(one_day_change, "one_day_pct_high", "one_day_pct_low", "one_day_pct_abs")
+    passes_week = _passes_pct(one_week_change, "one_week_pct_high", "one_week_pct_low", "one_week_pct_abs")
+    passes_month = _passes_pct(one_month_change, "one_month_pct_high", "one_month_pct_low", "one_month_pct_abs")
     min_dv = thresholds.get("min_dollar_volume", 1_000_000_000)
     passes_volume = dollar_volume >= min_dv
     if max_dollar_volume is not None:
@@ -282,7 +289,7 @@ def run_screener(config: Dict, symbols_override: Optional[List[str]] = None) -> 
 
 
 def run_rising_stars_screener(config: Dict, symbols_override: Optional[List[str]] = None) -> List[Dict]:
-    """Run screener for rising stars: 500M–1B dollar volume, 1D 3%, 1W 10%, 1M 20%."""
+    """Run screener for rising stars: 250M–1B dollar volume, asymmetric 1D/1W/1M bands."""
     rising = config.get("rising_stars_thresholds")
     if not rising:
         return []

@@ -102,7 +102,7 @@ def main():
     # Use real indices (all 5: S&P 500, Nasdaq, Dow 30, Russell 2000, VIX)
     indices_data = get_indices_snapshot()
 
-    msg1, msg2 = format_stock_message(
+    msg_indices, msg_big, msg_rising, msg_rest = format_stock_message(
         results,
         crypto_count=2,
         forex_count=1,
@@ -112,9 +112,10 @@ def main():
         etf_asset_class_order=["Equity", "Fixed Income", "Commodities", "Currency", "Asset Location", "Alternatives"],
         collection_time=collection_time,
     )
-    Path("sample_report_1.txt").write_text(msg1, encoding="utf-8")
-    Path("sample_report_2.txt").write_text(msg2, encoding="utf-8")
-    print("Wrote sample_report_1.txt and sample_report_2.txt")
+    for i, msg in enumerate([msg_indices, msg_big, msg_rising, msg_rest], 1):
+        if msg:
+            Path(f"sample_report_{i}.txt").write_text(msg, encoding="utf-8")
+            print(f"Wrote sample_report_{i}.txt")
     print("(Stocks/crypto/etc. are MOCK data. For a real report to Telegram, run: python run_screener.py)")
 
 if __name__ == "__main__":
