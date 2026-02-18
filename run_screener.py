@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 import yfinance as yf
-from screener.screener import load_config, run_screener, run_rising_stars_screener, run_crypto_screener, run_forex_screener, run_commodity_screener, run_etf_screener
+from screener.screener import load_config, run_screener, run_screener_and_rising_stars, run_crypto_screener, run_forex_screener, run_commodity_screener, run_etf_screener
 from screener.charts import generate_charts_for_results
 
 # Indices to show at top (symbol, display name). VIX gets 1D only; others get 1D/1W/1M.
@@ -529,11 +529,6 @@ def main() -> None:
     
     # Check if dry-run mode
     dry_run = config.get("dry_run", False)
-    
-    # When set (e.g. by GitHub Actions), send only stocks — for testing scheduled delivery
-    stocks_only = (os.getenv("MARKETSCOUT_STOCKS_ONLY") or "").strip().lower() in ("1", "true", "yes")
-    if stocks_only:
-        print("MARKETSCOUT_STOCKS_ONLY: sending stocks only (no indices, crypto, commodities, forex, ETFs).")
 
     # Quick sample: scan a short symbol list so a real report can be sent in ~1–2 min (for preview)
     quick_sample = (os.getenv("MARKETSCOUT_QUICK_SAMPLE") or "").strip().lower() in ("1", "true", "yes")
@@ -549,32 +544,25 @@ def main() -> None:
         ]))
         print(f"MARKETSCOUT_QUICK_SAMPLE: scanning {len(sample_symbols)} symbols only (real data, quick send).")
 
-    if not stocks_only:
-        print("Fetching indices...")
-        indices_data = get_indices_snapshot()
-    else:
-        indices_data = []
+    print("Fetching indices...")
+    indices_data = get_indices_snapshot()
 
     print("Starting MarketScout screener...")
-    results = run_screener(config, symbols_override=sample_symbols)
-    rising_stars_results = []
-    if not stocks_only and config.get("rising_stars_thresholds"):
-        rising_stars_results = run_rising_stars_screener(config, symbols_override=sample_symbols)
-    
-    if stocks_only:
-        crypto_results = []
-        forex_results = []
-        commodity_results = []
-        etf_results = []
+    if config.get("rising_stars_thresholds"):
+        # Single pass: get both big stocks and rising stars (avoids timeout/rate limits on scheduled runs)
+        results, rising_stars_results = run_screener_and_rising_stars(config, symbols_override=sample_symbols)
     else:
-        print("Scanning Crypto...")
-        crypto_results = run_crypto_screener(config)
-        print("Scanning Forex...")
-        forex_results = run_forex_screener(config)
-        print("Scanning Commodities...")
-        commodity_results = run_commodity_screener(config)
-        print("Scanning ETFs...")
-        etf_results = run_etf_screener(config)
+        results = run_screener(config, symbols_override=sample_symbols)
+        rising_stars_results = []
+    
+    print("Scanning Crypto...")
+    crypto_results = run_crypto_screener(config)
+    print("Scanning Forex...")
+    forex_results = run_forex_screener(config)
+    print("Scanning Commodities...")
+    commodity_results = run_commodity_screener(config)
+    print("Scanning ETFs...")
+    etf_results = run_etf_screener(config)
     
     collection_time = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M %Z")
     all_results = results + rising_stars_results + crypto_results + forex_results + commodity_results + etf_results

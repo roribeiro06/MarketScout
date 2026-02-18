@@ -149,7 +149,8 @@ def calculate_percent_change(data: pd.DataFrame, days: int) -> Optional[float]:
     return pct_change
 
 
-def screen_stock(
+def _evaluate_stock_data(
+    data: pd.DataFrame,
     symbol: str,
     config: Dict,
     thresholds_override: Optional[Dict] = None,
@@ -157,19 +158,15 @@ def screen_stock(
     override_sector: Optional[str] = None,
 ) -> Optional[Dict]:
     """
-    Screen a single stock against thresholds.
-    Returns dict with stock info if it passes screening, None otherwise.
-    Optional: thresholds_override (e.g. rising_stars_thresholds), max_dollar_volume for band filter, override_sector (e.g. "Rising Stars").
+    Evaluate already-fetched stock data against thresholds. Used by screen_stock and by
+    run_screener_and_rising_stars to avoid fetching the same symbol twice.
     """
+    if data is None or len(data) < 5:
+        return None
     thresholds = config.get("thresholds") or {}
     if thresholds_override is not None:
         thresholds = {**thresholds, **thresholds_override}
-    
-    # Fetch data (5y so we have 6M/1Y/3Y % for reference)
-    data = fetch_stock_data(symbol, period="5y")
-    if data is None or len(data) < 5:  # Reduced minimum days requirement
-        return None
-    
+
     # Calculate changes (use available days, not fixed). 126/252/756 ≈ 6M/1Y/3Y trading days
     one_day_change = calculate_percent_change(data, 1)
     one_week_change = calculate_percent_change(data, min(5, len(data) - 1))
@@ -272,6 +269,27 @@ def screen_stock(
     return None
 
 
+def screen_stock(
+    symbol: str,
+    config: Dict,
+    thresholds_override: Optional[Dict] = None,
+    max_dollar_volume: Optional[float] = None,
+    override_sector: Optional[str] = None,
+) -> Optional[Dict]:
+    """
+    Screen a single stock against thresholds.
+    Returns dict with stock info if it passes screening, None otherwise.
+    Optional: thresholds_override (e.g. rising_stars_thresholds), max_dollar_volume for band filter, override_sector (e.g. "Rising Stars").
+    """
+    data = fetch_stock_data(symbol, period="5y")
+    return _evaluate_stock_data(
+        data, symbol, config,
+        thresholds_override=thresholds_override,
+        max_dollar_volume=max_dollar_volume,
+        override_sector=override_sector,
+    )
+
+
 def run_screener(config: Dict, symbols_override: Optional[List[str]] = None) -> List[Dict]:
     """Run the screener across all configured exchanges, or over a given symbol list if provided."""
     all_results = []
@@ -335,6 +353,67 @@ def run_rising_stars_screener(config: Dict, symbols_override: Optional[List[str]
             seen_symbols.add(symbol)
             print(f"  [RISING] {symbol}: {result['one_day_pct']:.2f}% (1D)")
     return all_results
+
+
+def run_screener_and_rising_stars(
+    config: Dict, symbols_override: Optional[List[str]] = None
+) -> tuple:
+    """
+    Single pass over all symbols: fetch each symbol once, then classify as big stock
+    and/or rising star. Returns (big_stock_results, rising_star_results).
+    Use this instead of run_screener + run_rising_stars_screener to avoid timeouts
+    and rate limits on scheduled runs (only one API pass over the universe).
+    """
+    rising = config.get("rising_stars_thresholds")
+    max_dv_rising = rising.get("max_dollar_volume", 1_000_000_000) if rising else 1_000_000_000
+    exchanges = config.get("exchanges", [])
+
+    if symbols_override is not None:
+        symbols = symbols_override
+        print(f"Scanning {len(symbols)} symbols (single pass: big + rising stars)...")
+    else:
+        symbols = []
+        for exchange in exchanges:
+            symbols.extend(get_exchange_symbols(exchange))
+        symbols = list(dict.fromkeys(symbols))
+        print(f"Scanning {len(symbols)} symbols (single pass: big + rising stars)...")
+
+    big_results = []
+    rising_results = []
+    seen = set()
+
+    for symbol in symbols:
+        if symbol in seen:
+            continue
+        data = fetch_stock_data(symbol, period="5y")
+        if data is None or len(data) < 5:
+            continue
+        # Big-stock criteria (no override, no max_dollar_volume)
+        r_big = _evaluate_stock_data(
+            data, symbol, config,
+            thresholds_override=None,
+            max_dollar_volume=None,
+            override_sector=None,
+        )
+        if r_big:
+            big_results.append(r_big)
+            seen.add(symbol)
+            print(f"  [MATCH] {symbol}: {r_big['one_day_pct']:.2f}% (1D)")
+            continue
+        # Rising-star criteria (250M–1B vol, asymmetric %)
+        if rising:
+            r_rising = _evaluate_stock_data(
+                data, symbol, config,
+                thresholds_override=rising,
+                max_dollar_volume=max_dv_rising,
+                override_sector="Rising Stars",
+            )
+            if r_rising:
+                rising_results.append(r_rising)
+                seen.add(symbol)
+                print(f"  [RISING] {symbol}: {r_rising['one_day_pct']:.2f}% (1D)")
+
+    return (big_results, rising_results)
 
 
 # Crypto display names (fallback if not in config)
