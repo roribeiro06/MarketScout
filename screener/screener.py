@@ -81,7 +81,8 @@ def _fallback_exchange_symbols(exchange: str) -> List[str]:
             "HOOD", "COIN", "RIVN", "NBIS", "CRWV", "TOST", "PLTR", "SOFI",
             "LCID", "RBLX", "SNOW", "DDOG", "NET", "ZM", "DOCN", "UPST",
             "AFRM", "OPEN", "WISH", "CLOV", "SPCE", "FUBO", "NIO", "XPEV",
-            "LI", "BABA", "JD", "PDD", "BILI", "TME", "VIPS", "WB", "DKNG"
+            "LI", "BABA", "JD", "PDD", "BILI", "TME", "VIPS", "WB", "DKNG",
+            "CMG", "CCEP", "ULTA", "EW", "AAL",
         ]
     elif exchange == "NASDAQ":
         return [
@@ -92,7 +93,7 @@ def _fallback_exchange_symbols(exchange: str) -> List[str]:
             "HOOD", "COIN", "RIVN", "NBIS", "CRWV", "TOST", "PLTR", "SOFI",
             "LCID", "RBLX", "SNOW", "DDOG", "NET", "ZM", "DOCN", "UPST",
             "AFRM", "OPEN", "WISH", "CLOV", "SPCE", "FUBO", "NIO", "XPEV",
-            "DKNG"
+            "DKNG", "MRNA", "UAL",
         ]
     return []
 
@@ -181,7 +182,7 @@ def screen_stock(
     if one_day_change is None or one_week_change is None:
         return None
     
-    # Get current volume and price
+    # Get current volume and price (single day — so you can see when one day triggers high volume)
     current_volume = data["Volume"].iloc[-1]
     current_price = data["Close"].iloc[-1]
     dollar_volume = current_price * current_volume
@@ -198,9 +199,11 @@ def screen_stock(
     passes_week = _passes_pct(one_week_change, "one_week_pct_high", "one_week_pct_low", "one_week_pct_abs")
     passes_month = _passes_pct(one_month_change, "one_month_pct_high", "one_month_pct_low", "one_month_pct_abs")
     min_dv = thresholds.get("min_dollar_volume", 1_000_000_000)
-    passes_volume = dollar_volume >= min_dv
+    # Big stocks: over $1B. Rising stars: $250M to $1B (inclusive).
     if max_dollar_volume is not None:
-        passes_volume = passes_volume and (dollar_volume <= max_dollar_volume)
+        passes_volume = dollar_volume >= min_dv and dollar_volume <= max_dollar_volume
+    else:
+        passes_volume = dollar_volume > min_dv
     passes_price = current_price >= thresholds.get("min_price", 0)  # Default to 0 if not specified
     
     # Stock passes if it meets at least one of the three % criteria (1D, 1W, 1M) AND volume AND price

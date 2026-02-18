@@ -412,7 +412,7 @@ def format_stock_message(
                 msg_indices += f"  {d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str} | {three_yr_str}\n\n"
         msg_indices = msg_indices.strip()
 
-    # ---------- Message 2: Big stocks (≥$1B vol) ----------
+    # ---------- Message 2: Big stocks (≥$2B vol) ----------
     big_stocks = []
     for s in stock_sectors_regular:
         big_stocks.extend(by_sector[s])
@@ -539,10 +539,13 @@ def main() -> None:
     quick_sample = (os.getenv("MARKETSCOUT_QUICK_SAMPLE") or "").strip().lower() in ("1", "true", "yes")
     sample_symbols = None
     if quick_sample:
+        # Include big names + mid-caps that can qualify as rising stars (250M–1B vol): ULTA, EW, AAL, etc.
         sample_symbols = list(dict.fromkeys([
             "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "META", "NVDA", "JPM", "V", "WMT", "NFLX", "PLTR",
             "BAC", "XOM", "KO", "COST", "PEP", "CMCSA", "NKE", "RIVN", "ADBE", "INTC", "AMD", "AVGO",
             "DIS", "HD", "MCD", "CRM", "ORCL", "ABT", "ACN", "DHR", "GE", "CAT", "UNP", "HON",
+            "ULTA", "EW", "AAL", "DAL", "LUV", "CCL", "NCLH", "RCL", "MGM", "WYNN", "LVS", "HAS",
+            "BBY", "DKS", "GPS", "ANF", "ROST", "DLTR", "POOL", "FIVE", "WSM", "RH",
         ]))
         print(f"MARKETSCOUT_QUICK_SAMPLE: scanning {len(sample_symbols)} symbols only (real data, quick send).")
 
