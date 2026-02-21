@@ -348,14 +348,13 @@ def _format_one_stock_block(stocks: list) -> str:
         one_yr_str = f"1Y: {one_yr_val:+.2f}" if one_yr_val is not None else "1Y: —"
         three_yr_str = f"3Y: {three_yr_val:+.2f}" if three_yr_val is not None else "3Y: —"
         change_str = f"{d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str} | {three_yr_str}"
-        lines.append(f"{lead}<b>{html.escape(company_name)} ({symbol})</b> ${price:.2f}")
+        tp = stock.get("target_price")
+        price_str = f"${price:.2f}" + (f" (1Y: ${tp:.2f})" if tp is not None else "")
+        lines.append(f"{lead}<b>{html.escape(company_name)} ({symbol})</b> {price_str}")
         lines.append(f"  <i>{sector_name}</i>")
         lines.append(f"  {change_str}")
         if vol > 0:
             lines.append(f"  Vol: {vol_shares:.2f}M (${dollar_vol:.1f}M)")
-        tp = stock.get("target_price")
-        if tp is not None:
-            lines.append(f"  1Y target: ${tp:.2f}")
         lines.append("")
     return "\n".join(lines).strip()
 
@@ -471,12 +470,12 @@ def format_stock_message(
                 one_yr_str = f"1Y: {one_yr_val:+.2f}" if one_yr_val is not None else "1Y: —"
                 three_yr_str = f"3Y: {three_yr_val:+.2f}" if three_yr_val is not None else "3Y: —"
                 change_str = f"{d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str} | {three_yr_str}"
-                msg_rest += f"{lead}<b>{html.escape(company_name)} ({symbol})</b> ${price:.2f}\n"
+                tp = stock.get("target_price")
+                price_str = f"${price:.2f}" + (f" (1Y: ${tp:.2f})" if tp is not None else "")
+                msg_rest += f"{lead}<b>{html.escape(company_name)} ({symbol})</b> {price_str}\n"
                 msg_rest += f"  <i>{ac_label}</i>\n"
                 msg_rest += f"  {change_str}\n"
                 msg_rest += f"  Vol: {vol_shares:.2f}M (${dollar_vol:.1f}M)\n"
-                if stock.get("target_price") is not None:
-                    msg_rest += f"  1Y target: ${stock['target_price']:.2f}\n"
                 msg_rest += "\n"
             msg_rest += "\n"
         for ac in sorted(by_asset_class.keys()):
@@ -505,12 +504,12 @@ def format_stock_message(
                 one_yr_str = f"1Y: {one_yr_val:+.2f}" if one_yr_val is not None else "1Y: —"
                 three_yr_str = f"3Y: {three_yr_val:+.2f}" if three_yr_val is not None else "3Y: —"
                 change_str = f"{d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str} | {three_yr_str}"
-                msg_rest += f"{lead}<b>{html.escape(company_name)} ({symbol})</b> ${price:.2f}\n"
+                tp = stock.get("target_price")
+                price_str = f"${price:.2f}" + (f" (1Y: ${tp:.2f})" if tp is not None else "")
+                msg_rest += f"{lead}<b>{html.escape(company_name)} ({symbol})</b> {price_str}\n"
                 msg_rest += f"  <i>{ac_label}</i>\n"
                 msg_rest += f"  {change_str}\n"
                 msg_rest += f"  Vol: {vol_shares:.2f}M (${dollar_vol:.1f}M)\n"
-                if stock.get("target_price") is not None:
-                    msg_rest += f"  1Y target: ${stock['target_price']:.2f}\n"
                 msg_rest += "\n"
             msg_rest += "\n"
     if msg_rest.strip():
