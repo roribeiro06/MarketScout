@@ -504,9 +504,29 @@ def format_deep_dive_message(
         symbol = stock["symbol"]
         company_name = stock.get("company_name", symbol)
         sector_name = stock.get("display_sector") or stock.get("sector", "Other")
-        msg += f"<b>{html.escape(company_name)} ({symbol})</b>\n"
+        price = stock["price"]
+        vol = stock.get("volume") or 0
+        vol_shares = vol / 1_000_000
+        dollar_vol = (vol * price) / 1_000_000
+        tp = stock.get("target_price")
+        price_str = f"${price:.2f}" + (f" (1Y: ${tp:.2f})" if tp is not None else "")
+
+        # Same header block as regular stock report: name, ticker, price, target, sector, changes, vol
+        msg += f"🟡 <b>{html.escape(company_name)} ({symbol})</b> {price_str}\n"
         msg += f"  <i>{sector_name}</i>\n"
-        msg += f"  1D: {stock['one_day_pct']:+.2f}% | 1W: {stock['one_week_pct']:+.2f}% | 1M: {stock['one_month_pct']:+.2f}%\n\n"
+        d_str = _pct_str_no_pct("1D", stock["one_day_pct"], stock["passes_day"])
+        w_str = _pct_str_no_pct("1W", stock["one_week_pct"], stock["passes_week"])
+        m_str = _pct_str_no_pct("1M", stock.get("one_month_pct"), stock.get("passes_month"))
+        six_val = stock.get("one_6m_pct")
+        one_yr_val = stock.get("one_year_pct")
+        three_yr_val = stock.get("three_year_pct")
+        six_str = f"6M: {six_val:+.2f}" if six_val is not None else "6M: —"
+        one_yr_str = f"1Y: {one_yr_val:+.2f}" if one_yr_val is not None else "1Y: —"
+        three_yr_str = f"3Y: {three_yr_val:+.2f}" if three_yr_val is not None else "3Y: —"
+        msg += f"  {d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str} | {three_yr_str}\n"
+        if vol > 0:
+            msg += f"  Vol: {vol_shares:.2f}M (${dollar_vol:.1f}M)\n"
+        msg += "\n"
 
         stats = _fetch_stock_financial_stats(symbol)
         if not stats:
