@@ -370,7 +370,9 @@ def format_stock_message(
     collection_time: Optional[str] = None,
 ) -> Tuple[str, str, str, str]:
     """Format into 4 Telegram messages: (1) Indices, (2) Big stocks, (3) Rising stars, (4) Crypto+Commodities+Forex+ETFs."""
-    time_header = ("🕐 Data as of " + collection_time + "\n\n" if collection_time else "")
+    # Visual section end: white circles so each section is easy to spot
+    SECTION_END = "\n\n⚪⚪⚪⚪⚪⚪⚪⚪⚪⚪"
+    time_header = ("🕐 Yahoo data as of " + collection_time + "\n\n" if collection_time else "")
     non_stock = {"Crypto", "Forex", "Commodities", "ETFs"}
     by_sector = {}
     for stock in results:
@@ -409,7 +411,7 @@ def format_stock_message(
                 three_yr_str = f"3Y: {three_yr:+.2f}" if three_yr is not None else "3Y: —"
                 msg_indices += f"<b>{html.escape(name)} ({symbol})</b> {price:.2f}\n"
                 msg_indices += f"  {d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str} | {three_yr_str}\n\n"
-        msg_indices = msg_indices.strip()
+        msg_indices = (msg_indices.strip() + SECTION_END) if msg_indices.strip() else ""
 
     # ---------- Message 2: Big stocks (≥$2B vol) ----------
     big_stocks = []
@@ -420,7 +422,7 @@ def format_stock_message(
         msg_big = time_header + "📊 <b>MarketScout (2/4) — Stocks ≥$1B vol</b>\n\n"
         msg_big += f"Found {len(big_stocks)} stock(s) matching criteria:\n\n"
         msg_big += "<b>📈 Stocks (≥$1B vol)</b>\n"
-        msg_big += _format_one_stock_block(big_stocks)
+        msg_big += _format_one_stock_block(big_stocks) + SECTION_END
 
     # ---------- Message 3: Rising stars (250M–$1B vol) ----------
     rising_stocks = by_sector.get("Rising Stars", [])
@@ -429,7 +431,7 @@ def format_stock_message(
         msg_rising = time_header + "📊 <b>MarketScout (3/4) — Rising Stars</b>\n\n"
         msg_rising += f"Found {len(rising_stocks)} rising star(s) matching criteria:\n\n"
         msg_rising += "<b>⭐ Rising Stars (250M–$1B vol)</b>\n"
-        msg_rising += _format_one_stock_block(rising_stocks)
+        msg_rising += _format_one_stock_block(rising_stocks) + SECTION_END
 
     # ---------- Message 4: Crypto, Commodities, Forex, ETFs ----------
     msg_rest = ""
@@ -513,7 +515,7 @@ def format_stock_message(
                 msg_rest += "\n"
             msg_rest += "\n"
     if msg_rest.strip():
-        msg_rest = time_header + "📊 <b>MarketScout (4/4) — Crypto, Commodities, Forex, ETFs</b>\n\n" + msg_rest.strip()
+        msg_rest = time_header + "📊 <b>MarketScout (4/4) — Crypto, Commodities, Forex, ETFs</b>\n\n" + msg_rest.strip() + SECTION_END
 
     return (msg_indices.strip(), msg_big.strip(), msg_rising.strip(), msg_rest.strip())
 
@@ -543,6 +545,8 @@ def main() -> None:
         ]))
         print(f"MARKETSCOUT_QUICK_SAMPLE: scanning {len(sample_symbols)} symbols only (real data, quick send).")
 
+    # Capture time when we start pulling from Yahoo (not when we send)
+    collection_time = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M %Z")
     print("Fetching indices...")
     indices_data = get_indices_snapshot()
 
@@ -564,8 +568,7 @@ def main() -> None:
     else:
         results = run_screener(config, symbols_override=sample_symbols)
         rising_stars_results = []
-    
-    collection_time = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M %Z")
+
     all_results = results + rising_stars_results + crypto_results + forex_results + commodity_results + etf_results
     crypto_count = len(crypto_results)
     forex_count = len(forex_results)
