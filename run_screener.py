@@ -588,6 +588,73 @@ def format_deep_dive_message(
     return (msg.strip() + SECTION_END).strip()
 
 
+def _criteria_count(r: dict) -> int:
+    """Count how many of 1D, 1W, 1M criteria the asset passes."""
+    return sum(1 for k in ("passes_day", "passes_week", "passes_month") if r.get(k))
+
+
+def _get_next_earnings_date(symbol: str) -> Optional[str]:
+    """Fetch next earnings date for a symbol. Returns YYYY-MM-DD string or None."""
+    try:
+        t = yf.Ticker(symbol)
+        ed = t.earnings_dates
+        if ed is not None and not ed.empty:
+            first_date = ed.index[0]
+            if hasattr(first_date, "strftime"):
+                return first_date.strftime("%Y-%m-%d")
+            return str(first_date)
+        cal = getattr(t, "calendar", None)
+        if isinstance(cal, dict):
+            for k in ("earningsDate", "earnings", "nextEarnings"):
+                v = cal.get(k)
+                if v is not None and hasattr(v, "strftime"):
+                    return v.strftime("%Y-%m-%d")
+    except Exception:
+        pass
+    return None
+
+
+def format_earnings_message(
+    all_results: list,
+    collection_time: Optional[str] = None,
+) -> str:
+    """
+    Format a 6th message for stocks that pass 2 of 3 criteria (1D, 1W, 1M), regardless of direction.
+    Shows next earnings date for each.
+    """
+    non_stock = {"Crypto", "Forex", "Commodities", "ETFs"}
+    qualifying = [
+        r for r in all_results
+        if r.get("sector") not in non_stock
+        and _criteria_count(r) >= 2
+    ]
+    if not qualifying:
+        return ""
+
+    SECTION_END = "\n\n🔵🔵🔵🔵🔵🔵🔵🔵🔵🔵"
+    time_header = ("🕐 Yahoo data as of " + collection_time + "\n\n" if collection_time else "")
+    msg = time_header + "📅 <b>MarketScout — Earnings Dates (2 of 3 criteria met)</b>\n\n"
+    msg += "Stocks below passed at least 2 of 1D/1W/1M thresholds:\n\n"
+
+    time.sleep(1.5)
+    for stock in sorted(qualifying, key=_pct_sort_key):
+        symbol = stock["symbol"]
+        company_name = stock.get("company_name", symbol)
+        sector_name = stock.get("display_sector") or stock.get("sector", "Other")
+        d_str = _pct_str_no_pct("1D", stock["one_day_pct"], stock["passes_day"])
+        w_str = _pct_str_no_pct("1W", stock["one_week_pct"], stock["passes_week"])
+        m_str = _pct_str_no_pct("1M", stock.get("one_month_pct"), stock.get("passes_month"))
+
+        msg += f"<b>{html.escape(company_name)} ({symbol})</b>\n"
+        msg += f"  <i>{sector_name}</i>\n"
+        msg += f"  {d_str} | {w_str} | {m_str}\n"
+        earnings_date = _get_next_earnings_date(symbol)
+        msg += f"  📅 Next earnings: {earnings_date or '—'}\n\n"
+        time.sleep(1.0)
+
+    return (msg.strip() + SECTION_END).strip()
+
+
 def format_stock_message(
     results: list,
     crypto_count: int = 0,
@@ -822,6 +889,11 @@ def main() -> None:
     if msg_deep:
         messages.append(msg_deep)
 
+    # Earnings dates: stocks that pass 2 of 3 criteria (regardless of direction)
+    msg_earnings = format_earnings_message(all_results, collection_time=collection_time)
+    if msg_earnings:
+        messages.append(msg_earnings)
+
     messages = [m for m in messages if m]
 
     if dry_run:
@@ -848,11 +920,6 @@ def main() -> None:
         print(f"\nTelegram notification sent ({len(messages)} messages): {len(results)} stock(s), {len(rising_stars_results)} rising star(s), {etf_count} ETF(s), {crypto_count} crypto, {forex_count} forex, {commodity_count} commodities")
         
         # Generate and send charts only for assets that pass at least 2 of 3 criteria (1D, 1W, 1M)
-        def _criteria_count(r: dict) -> int:
-            return sum(
-                1 for k in ("passes_day", "passes_week", "passes_month")
-                if r.get(k)
-            )
         results_for_charts = [r for r in all_results if _criteria_count(r) >= 2]
         print(f"  Assets with 2+ criteria (for charts): {len(results_for_charts)}")
         if results_for_charts:
