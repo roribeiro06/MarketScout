@@ -265,6 +265,124 @@ def _all_three_pass(item: dict) -> bool:
     )
 
 
+def _all_three_positive(item: dict) -> bool:
+    """True if asset passes 1D, 1W, and 1M criteria and all moved up (positive)."""
+    if not _all_three_pass(item):
+        return False
+    d = item.get("one_day_pct")
+    w = item.get("one_week_pct")
+    m = item.get("one_month_pct")
+    return (d is not None and d > 0 and w is not None and w > 0 and m is not None and m > 0)
+
+
+def _format_big_num(x: Optional[float]) -> str:
+    """Format large numbers as $X.XB or $X.XM or $X.XK."""
+    if x is None or (isinstance(x, float) and (x != x or x == 0)):
+        return "—"
+    try:
+        x = float(x)
+    except (TypeError, ValueError):
+        return "—"
+    if abs(x) >= 1e12:
+        return f"${x/1e12:.2f}T"
+    if abs(x) >= 1e9:
+        return f"${x/1e9:.2f}B"
+    if abs(x) >= 1e6:
+        return f"${x/1e6:.2f}M"
+    if abs(x) >= 1e3:
+        return f"${x/1e3:.2f}K"
+    return f"${x:.2f}"
+
+
+def _fetch_stock_financial_stats(symbol: str) -> Optional[Dict]:
+    """Fetch financial stats for a stock from yfinance. Returns dict or None on error."""
+    try:
+        t = yf.Ticker(symbol)
+        info = t.info
+        if not info:
+            return None
+
+        def _get(k, default=None):
+            v = info.get(k, default)
+            if v is None:
+                return default
+            try:
+                return float(v) if isinstance(v, (int, float)) else default
+            except (TypeError, ValueError):
+                return default
+
+        shares = _get("sharesOutstanding") or _get("impliedSharesOutstanding")
+        market_cap = _get("marketCap")
+        profit_margin = _get("profitMargins")  # decimal
+        total_revenue = _get("totalRevenue")
+        gross_profit = _get("grossProfits")
+        total_cash = _get("totalCash") or _get("cash")
+        total_debt = _get("totalDebt")
+        oper_cf = _get("operatingCashflow")
+        fwd_div = _get("forwardDividendRate") or _get("dividendRate")
+        div_yield = _get("dividendYield")  # decimal
+        revenue_per_share = _get("revenuePerShare")
+        if revenue_per_share is None and total_revenue and shares:
+            revenue_per_share = total_revenue / shares
+        cash_per_share = _get("totalCashPerShare")
+        if cash_per_share is None and total_cash and shares:
+            cash_per_share = total_cash / shares
+
+        # Balance sheet: current assets / current liabilities
+        curr_assets = None
+        curr_liab = None
+        try:
+            bs = t.balance_sheet
+            if bs is not None and not bs.empty:
+                # Row names vary by source; try common labels
+                for label in ["Total Current Assets", "Current Assets", "Total Current Liabilities", "Current Liabilities"]:
+                    if label in bs.index:
+                        row = bs.loc[label]
+                        val = row.iloc[0] if hasattr(row, "iloc") else (row[0] if len(row) else None)
+                        if val is not None and not (isinstance(val, float) and val != val):
+                            if "Asset" in label:
+                                curr_assets = float(val)
+                            else:
+                                curr_liab = float(val)
+        except Exception:
+            pass
+
+        # Income statement: operating income / total revenue * 100
+        oper_income = None
+        try:
+            inc = t.income_stmt
+            if inc is not None and not inc.empty:
+                for label in ["Operating Income", "Operating Income Loss"]:
+                    if label in inc.index:
+                        row = inc.loc[label]
+                        val = row.iloc[0] if hasattr(row, "iloc") else (row[0] if len(row) else None)
+                        if val is not None and not (isinstance(val, float) and val != val):
+                            oper_income = float(val)
+                            break
+        except Exception:
+            pass
+
+        return {
+            "market_cap": market_cap,
+            "profit_margin": profit_margin,
+            "total_revenue": total_revenue,
+            "revenue_per_share": revenue_per_share,
+            "gross_profit": gross_profit,
+            "total_cash": total_cash,
+            "cash_per_share": cash_per_share,
+            "total_debt": total_debt,
+            "operating_cashflow": oper_cf,
+            "forward_dividend": fwd_div,
+            "dividend_yield": div_yield,
+            "current_assets": curr_assets,
+            "current_liabilities": curr_liab,
+            "operating_income": oper_income,
+        }
+    except Exception as e:
+        print(f"  [DEEP] Error fetching financials for {symbol}: {e}")
+        return None
+
+
 def _append_section_block(
     message: str,
     by_sector: dict,
@@ -357,6 +475,79 @@ def _format_one_stock_block(stocks: list) -> str:
             lines.append(f"  Vol: {vol_shares:.2f}M (${dollar_vol:.1f}M)")
         lines.append("")
     return "\n".join(lines).strip()
+
+
+def format_deep_dive_message(
+    all_results: list,
+    collection_time: Optional[str] = None,
+) -> str:
+    """
+    Format a separate message for stocks that pass all 3 criteria positively (1D, 1W, 1M all up).
+    Includes market cap, profit margin, revenue, gross profit, cash, debt, operating CF, forward div,
+    plus balance sheet and income statement notes.
+    """
+    non_stock = {"Crypto", "Forex", "Commodities", "ETFs"}
+    qualifying = [
+        r for r in all_results
+        if r.get("sector") not in non_stock
+        and _all_three_positive(r)
+    ]
+    if not qualifying:
+        return ""
+
+    SECTION_END = "\n\n🔵🔵🔵🔵🔵🔵🔵🔵🔵🔵"
+    time_header = ("🕐 Yahoo data as of " + collection_time + "\n\n" if collection_time else "")
+    msg = time_header + "📊 <b>MarketScout — Deep Dive (all 3 criteria positive, 1D/1W/1M up)</b>\n\n"
+    msg += "Stocks below passed 1D, 1W, and 1M thresholds with all positive moves:\n\n"
+
+    for stock in sorted(qualifying, key=_pct_sort_key):
+        symbol = stock["symbol"]
+        company_name = stock.get("company_name", symbol)
+        sector_name = stock.get("display_sector") or stock.get("sector", "Other")
+        msg += f"<b>{html.escape(company_name)} ({symbol})</b>\n"
+        msg += f"  <i>{sector_name}</i>\n"
+        msg += f"  1D: {stock['one_day_pct']:+.2f}% | 1W: {stock['one_week_pct']:+.2f}% | 1M: {stock['one_month_pct']:+.2f}%\n\n"
+
+        stats = _fetch_stock_financial_stats(symbol)
+        if not stats:
+            msg += "  (Financial data unavailable)\n\n"
+            continue
+
+        # Core stats
+        msg += f"  Market cap: {_format_big_num(stats['market_cap'])}\n"
+        pm = stats.get("profit_margin")
+        msg += f"  Profit margin: {pm*100:.1f}%\n" if pm is not None else "  Profit margin: —\n"
+        rev = stats.get("total_revenue")
+        rps = stats.get("revenue_per_share")
+        msg += f"  Revenue: {_format_big_num(rev)}" + (f" (${rps:.2f}/share)" if rps is not None else "") + "\n"
+        msg += f"  Gross profit: {_format_big_num(stats.get('gross_profit'))}\n"
+        tc = stats.get("total_cash")
+        cps = stats.get("cash_per_share")
+        msg += f"  Total cash: {_format_big_num(tc)}" + (f" (${cps:.2f}/share)" if cps is not None else "") + "\n"
+        msg += f"  Total debt: {_format_big_num(stats.get('total_debt'))}\n"
+        msg += f"  Operating cash flow: {_format_big_num(stats.get('operating_cashflow'))}\n"
+        fd = stats.get("forward_dividend")
+        dy = stats.get("dividend_yield")
+        msg += f"  Forward dividend: " + (f"${fd:.2f}" if fd is not None else "—")
+        msg += (f" ({dy*100:.2f}% yield)" if dy is not None else "") + "\n\n"
+
+        # Notes
+        ca, cl = stats.get("current_assets"), stats.get("current_liabilities")
+        if ca is not None and cl is not None and cl != 0:
+            ratio = ca / cl
+            msg += f"  Balance sheet: Current assets/liabilities = {ratio:.2f} (ideally above 1)\n"
+        else:
+            msg += "  Balance sheet: Current assets/liabilities = — (ideally above 1)\n"
+
+        oi, tr = stats.get("operating_income"), stats.get("total_revenue")
+        if oi is not None and tr is not None and tr != 0:
+            pct = (oi / tr) * 100
+            msg += f"  Income statement: Operating income/Revenue = {pct:.1f}% (ideally above 15%)\n"
+        else:
+            msg += "  Income statement: Operating income/Revenue = — (ideally above 15%)\n"
+
+        msg += "\n"
+    return (msg.strip() + SECTION_END).strip()
 
 
 def format_stock_message(
@@ -587,6 +778,12 @@ def main() -> None:
         collection_time=collection_time,
     )
     messages = [msg_indices, msg_big, msg_rising, msg_rest]
+
+    # Deep dive: stocks that passed all 3 criteria positively (1D, 1W, 1M all up)
+    msg_deep = format_deep_dive_message(all_results, collection_time=collection_time)
+    if msg_deep:
+        messages.append(msg_deep)
+
     messages = [m for m in messages if m]
 
     if dry_run:
