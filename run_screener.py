@@ -371,7 +371,7 @@ def format_stock_message(
 ) -> Tuple[str, str, str, str]:
     """Format into 4 Telegram messages: (1) Indices, (2) Big stocks, (3) Rising stars, (4) Crypto+Commodities+Forex+ETFs."""
     # Visual section end: white circles so each section is easy to spot
-    SECTION_END = "\n\n⚪⚪⚪⚪⚪⚪⚪⚪⚪⚪"
+    SECTION_END = "\n\n🔵🔵🔵🔵🔵🔵🔵🔵🔵🔵"
     time_header = ("🕐 Yahoo data as of " + collection_time + "\n\n" if collection_time else "")
     non_stock = {"Crypto", "Forex", "Commodities", "ETFs"}
     by_sector = {}
