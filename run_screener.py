@@ -567,7 +567,11 @@ def format_deep_dive_message(
         fd = stats.get("forward_dividend")
         dy = stats.get("dividend_yield")
         msg += f"  Forward dividend: " + (f"${fd:.2f}" if fd is not None else "—")
-        msg += (f" ({dy*100:.2f}% yield)" if dy is not None else "") + "\n\n"
+        if dy is not None:
+            # Yahoo may return decimal (0.0096) or percentage (0.96); show as %
+            pct = (dy * 100) if dy < 0.1 else dy
+            msg += f" ({pct:.2f}% yield)"
+        msg += "\n\n"
 
         # Notes
         ca, cl = stats.get("current_assets"), stats.get("current_liabilities")
@@ -634,7 +638,7 @@ def format_earnings_message(
     SECTION_END = "\n\n🔵🔵🔵🔵🔵🔵🔵🔵🔵🔵"
     time_header = ("🕐 Yahoo data as of " + collection_time + "\n\n" if collection_time else "")
     msg = time_header + "📅 <b>MarketScout — Earnings Dates (2 of 3 criteria met)</b>\n\n"
-    msg += "Stocks below passed at least 2 of 1D/1W/1M thresholds (ordered by nearest earnings date):\n\n"
+    msg += "Stocks with upcoming earnings that passed at least 2 of 1D/1W/1M (ordered by nearest date):\n\n"
 
     time.sleep(1.5)
     today = datetime.now(ZoneInfo("America/New_York")).date()
@@ -653,13 +657,24 @@ def format_earnings_message(
             pass
         return (1, 999999)
 
-    # Fetch earnings date once per stock, then sort by closest to today
+    # Fetch earnings date once per stock; keep only upcoming (future) earnings
     stock_dates = []
     for stock in qualifying:
         symbol = stock["symbol"]
         earnings_date = _get_next_earnings_date(symbol)
-        stock_dates.append((stock, earnings_date))
+        if not earnings_date:
+            continue
+        try:
+            parts = earnings_date.split("-")
+            if len(parts) == 3:
+                ed = today.__class__(int(parts[0]), int(parts[1]), int(parts[2]))
+                if (ed - today).days >= 0:
+                    stock_dates.append((stock, earnings_date))
+        except (ValueError, IndexError):
+            continue
         time.sleep(1.0)
+    if not stock_dates:
+        return ""
     stock_dates.sort(key=_earnings_sort_key)
 
     for stock, earnings_date in stock_dates:
