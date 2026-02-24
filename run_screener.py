@@ -295,13 +295,15 @@ def _format_big_num(x: Optional[float]) -> str:
     return f"${x:.2f}"
 
 
-def _fetch_stock_financial_stats(symbol: str, delay_seconds: float = 1.5) -> Optional[Dict]:
+def _fetch_stock_financial_stats(symbol: str, delay_seconds: float = 2.0) -> Optional[Dict]:
     """Fetch financial stats for a stock from yfinance. Returns dict or None on total failure.
-    Uses retry and delay to handle rate limiting."""
+    Uses retries, delay, fast_info fallback, and quarterly financials when yearly are empty."""
     time.sleep(delay_seconds)
     stats = {}
 
     def _get(info_dict: dict, k: str, default=None):
+        if not isinstance(info_dict, dict):
+            return default
         v = info_dict.get(k, default)
         if v is None:
             return default
@@ -310,91 +312,106 @@ def _fetch_stock_financial_stats(symbol: str, delay_seconds: float = 1.5) -> Opt
         except (TypeError, ValueError):
             return default
 
-    for attempt in range(2):
+    def _fill_from_info(t, info_dict: dict) -> dict:
+        shares = _get(info_dict, "sharesOutstanding") or _get(info_dict, "impliedSharesOutstanding")
+        market_cap = _get(info_dict, "marketCap")
+        profit_margin = _get(info_dict, "profitMargins")
+        total_revenue = _get(info_dict, "totalRevenue")
+        gross_profit = _get(info_dict, "grossProfits")
+        total_cash = _get(info_dict, "totalCash") or _get(info_dict, "cash")
+        total_debt = _get(info_dict, "totalDebt")
+        oper_cf = _get(info_dict, "operatingCashflow")
+        fwd_div = _get(info_dict, "forwardDividendRate") or _get(info_dict, "dividendRate")
+        div_yield = _get(info_dict, "dividendYield")
+        revenue_per_share = _get(info_dict, "revenuePerShare")
+        if revenue_per_share is None and total_revenue and shares:
+            revenue_per_share = total_revenue / shares
+        cash_per_share = _get(info_dict, "totalCashPerShare")
+        if cash_per_share is None and total_cash and shares:
+            cash_per_share = total_cash / shares
+        return {
+            "market_cap": market_cap,
+            "profit_margin": profit_margin,
+            "total_revenue": total_revenue,
+            "revenue_per_share": revenue_per_share,
+            "gross_profit": gross_profit,
+            "total_cash": total_cash,
+            "cash_per_share": cash_per_share,
+            "total_debt": total_debt,
+            "operating_cashflow": oper_cf,
+            "forward_dividend": fwd_div,
+            "dividend_yield": div_yield,
+            "current_assets": None,
+            "current_liabilities": None,
+            "operating_income": None,
+        }
+
+    def _fill_balance_income(t, s: dict) -> None:
+        for attr in [("balance_sheet", False), ("quarterly_balance_sheet", True)]:
+            try:
+                bs = getattr(t, attr[0], None)
+                if bs is None or getattr(bs, "empty", True) or not hasattr(bs, "index"):
+                    continue
+                for label in ["Total Current Assets", "Current Assets", "Total Current Liabilities", "Current Liabilities"]:
+                    if label in bs.index:
+                        row = bs.loc[label]
+                        val = row.iloc[0] if hasattr(row, "iloc") and len(row) else (row[0] if len(row) else None)
+                        if val is not None and not (isinstance(val, float) and (val != val)):
+                            try:
+                                fval = float(val)
+                                if "Asset" in label:
+                                    s["current_assets"] = s["current_assets"] or fval
+                                else:
+                                    s["current_liabilities"] = s["current_liabilities"] or fval
+                            except (TypeError, ValueError):
+                                pass
+                if s["current_assets"] is not None and s["current_liabilities"] is not None:
+                    break
+            except Exception:
+                pass
+        for attr in ["income_stmt", "quarterly_income_stmt"]:
+            try:
+                inc = getattr(t, attr, None)
+                if inc is None or getattr(inc, "empty", True) or not hasattr(inc, "index"):
+                    continue
+                for label in ["Operating Income", "Operating Income Loss", "Total Operating Income As Reported"]:
+                    if label in inc.index:
+                        row = inc.loc[label]
+                        val = row.iloc[0] if hasattr(row, "iloc") and len(row) else (row[0] if len(row) else None)
+                        if val is not None and not (isinstance(val, float) and (val != val)):
+                            try:
+                                s["operating_income"] = float(val)
+                                break
+                            except (TypeError, ValueError):
+                                pass
+                if s["operating_income"] is not None:
+                    break
+            except Exception:
+                pass
+
+    for attempt in range(3):
         try:
             t = yf.Ticker(symbol)
-            info = t.info
-            if not isinstance(info, dict):
-                continue
-
-            shares = _get(info, "sharesOutstanding") or _get(info, "impliedSharesOutstanding")
-            market_cap = _get(info, "marketCap")
-            profit_margin = _get(info, "profitMargins")
-            total_revenue = _get(info, "totalRevenue")
-            gross_profit = _get(info, "grossProfits")
-            total_cash = _get(info, "totalCash") or _get(info, "cash")
-            total_debt = _get(info, "totalDebt")
-            oper_cf = _get(info, "operatingCashflow")
-            fwd_div = _get(info, "forwardDividendRate") or _get(info, "dividendRate")
-            div_yield = _get(info, "dividendYield")
-            revenue_per_share = _get(info, "revenuePerShare")
-            if revenue_per_share is None and total_revenue and shares:
-                revenue_per_share = total_revenue / shares
-            cash_per_share = _get(info, "totalCashPerShare")
-            if cash_per_share is None and total_cash and shares:
-                cash_per_share = total_cash / shares
-
-            stats = {
-                "market_cap": market_cap,
-                "profit_margin": profit_margin,
-                "total_revenue": total_revenue,
-                "revenue_per_share": revenue_per_share,
-                "gross_profit": gross_profit,
-                "total_cash": total_cash,
-                "cash_per_share": cash_per_share,
-                "total_debt": total_debt,
-                "operating_cashflow": oper_cf,
-                "forward_dividend": fwd_div,
-                "dividend_yield": div_yield,
-                "current_assets": None,
-                "current_liabilities": None,
-                "operating_income": None,
-            }
-
-            # Balance sheet: current assets / current liabilities
-            try:
-                bs = t.balance_sheet
-                if bs is not None and not bs.empty and hasattr(bs, "index"):
-                    for label in ["Total Current Assets", "Current Assets", "Total Current Liabilities", "Current Liabilities"]:
-                        if label in bs.index:
-                            row = bs.loc[label]
-                            val = row.iloc[0] if hasattr(row, "iloc") and len(row) else (row[0] if len(row) else None)
-                            if val is not None and not (isinstance(val, float) and (val != val)):
-                                try:
-                                    fval = float(val)
-                                    if "Asset" in label:
-                                        stats["current_assets"] = fval
-                                    else:
-                                        stats["current_liabilities"] = fval
-                                except (TypeError, ValueError):
-                                    pass
-            except Exception:
-                pass
-
-            # Income statement: operating income
-            try:
-                inc = t.income_stmt
-                if inc is not None and not inc.empty and hasattr(inc, "index"):
-                    for label in ["Operating Income", "Operating Income Loss", "Total Operating Income As Reported"]:
-                        if label in inc.index:
-                            row = inc.loc[label]
-                            val = row.iloc[0] if hasattr(row, "iloc") and len(row) else (row[0] if len(row) else None)
-                            if val is not None and not (isinstance(val, float) and (val != val)):
-                                try:
-                                    stats["operating_income"] = float(val)
-                                    break
-                                except (TypeError, ValueError):
-                                    pass
-            except Exception:
-                pass
-
-            # Return if we got any useful data
+            info = getattr(t, "info", None)
+            if isinstance(info, dict) and info:
+                stats = _fill_from_info(t, info)
+            else:
+                stats = _fill_from_info(t, {})
+                try:
+                    fast = getattr(t, "fast_info", None)
+                    if fast is not None:
+                        mc = getattr(fast, "market_cap", None)
+                        if mc is not None:
+                            stats["market_cap"] = float(mc)
+                except Exception:
+                    pass
+            _fill_balance_income(t, stats)
             if any(v is not None for v in stats.values()):
                 return stats
         except Exception as e:
             print(f"  [DEEP] Attempt {attempt + 1} for {symbol}: {e}")
-            if attempt == 0:
-                time.sleep(2.0)
+            if attempt < 2:
+                time.sleep(3.0 + attempt)
 
     return stats if any(v is not None for v in stats.values()) else None
 
@@ -517,7 +534,7 @@ def format_deep_dive_message(
     msg += "Stocks below passed 1D, 1W, and 1M thresholds with all positive moves:\n\n"
 
     # Brief pause before fetching financials (helps avoid Yahoo rate limit after stock scan)
-    time.sleep(2.0)
+    time.sleep(3.0)
     for stock in sorted(qualifying, key=_pct_sort_key):
         symbol = stock["symbol"]
         company_name = stock.get("company_name", symbol)
@@ -546,7 +563,9 @@ def format_deep_dive_message(
             msg += f"  Vol: {vol_shares:.2f}M (${dollar_vol:.1f}M)\n"
         msg += "\n"
 
-        stats = _fetch_stock_financial_stats(symbol)
+        stats = _fetch_stock_financial_stats(symbol, delay_seconds=2.5)
+        if not stats:
+            stats = _fetch_stock_financial_stats(symbol, delay_seconds=5.0)
         if not stats:
             msg += "  (Financial data unavailable)\n\n"
             continue
