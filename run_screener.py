@@ -634,10 +634,35 @@ def format_earnings_message(
     SECTION_END = "\n\n🔵🔵🔵🔵🔵🔵🔵🔵🔵🔵"
     time_header = ("🕐 Yahoo data as of " + collection_time + "\n\n" if collection_time else "")
     msg = time_header + "📅 <b>MarketScout — Earnings Dates (2 of 3 criteria met)</b>\n\n"
-    msg += "Stocks below passed at least 2 of 1D/1W/1M thresholds:\n\n"
+    msg += "Stocks below passed at least 2 of 1D/1W/1M thresholds (ordered by nearest earnings date):\n\n"
 
     time.sleep(1.5)
-    for stock in sorted(qualifying, key=_pct_sort_key):
+    today = datetime.now(ZoneInfo("America/New_York")).date()
+
+    def _earnings_sort_key(item):
+        stock, earnings_str = item
+        if not earnings_str:
+            return (1, 999999)  # no date last
+        try:
+            parts = earnings_str.split("-")
+            if len(parts) == 3:
+                ed = today.__class__(int(parts[0]), int(parts[1]), int(parts[2]))
+                days = (ed - today).days
+                return (0, days if days >= 0 else 999998)  # past dates before no-date
+        except (ValueError, IndexError):
+            pass
+        return (1, 999999)
+
+    # Fetch earnings date once per stock, then sort by closest to today
+    stock_dates = []
+    for stock in qualifying:
+        symbol = stock["symbol"]
+        earnings_date = _get_next_earnings_date(symbol)
+        stock_dates.append((stock, earnings_date))
+        time.sleep(1.0)
+    stock_dates.sort(key=_earnings_sort_key)
+
+    for stock, earnings_date in stock_dates:
         symbol = stock["symbol"]
         company_name = stock.get("company_name", symbol)
         sector_name = stock.get("display_sector") or stock.get("sector", "Other")
@@ -648,9 +673,7 @@ def format_earnings_message(
         msg += f"<b>{html.escape(company_name)} ({symbol})</b>\n"
         msg += f"  <i>{sector_name}</i>\n"
         msg += f"  {d_str} | {w_str} | {m_str}\n"
-        earnings_date = _get_next_earnings_date(symbol)
         msg += f"  📅 Next earnings: {earnings_date or '—'}\n\n"
-        time.sleep(1.0)
 
     return (msg.strip() + SECTION_END).strip()
 
