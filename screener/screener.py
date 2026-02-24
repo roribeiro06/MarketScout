@@ -375,7 +375,7 @@ def run_screener_and_rising_stars(
         symbols = []
         for exchange in exchanges:
             symbols.extend(get_exchange_symbols(exchange))
-        symbols = list(dict.fromkeys(symbols))
+        symbols = sorted(list(dict.fromkeys(symbols)))
         print(f"Scanning {len(symbols)} symbols (single pass: big + rising stars)...")
 
     big_results = []
