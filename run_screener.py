@@ -604,7 +604,11 @@ def _format_one_stock_block(stocks: list) -> str:
 def format_deep_dive_message(
     all_results: list,
     collection_time: Optional[str] = None,
+    from_premarket: bool = False,
 ) -> str:
+    """
+    Stocks that pass all 3 criteria AND all three moves positive.
+    If from_premarket, uses all_results as universe (1-day stocks) and custom header.
     """
     Format a separate message for stocks that pass all 3 criteria positively (1D, 1W, 1M all up).
     Includes market cap, profit margin, revenue, gross profit, cash, debt, operating CF, forward div,
@@ -621,9 +625,14 @@ def format_deep_dive_message(
 
     SECTION_END = "\n\n🔵🔵🔵🔵🔵🔵🔵🔵🔵🔵"
     time_header = ("🕐 Yahoo data as of " + collection_time + "\n\n" if collection_time else "")
-    msg = time_header + "📊 <b>MarketScout — Deep Dive (1D, 1W, 1M all three criteria met)</b>\n\n"
-    msg += f"Stocks in this report: <b>{len(qualifying)}</b>\n\n"
-    msg += "Stocks below pass all three criteria AND have 1D, 1W, and 1M all positive with key financials:\n\n"
+    if from_premarket:
+        msg = time_header + "📊 <b>MarketScout — Premarket Deep Dive (1D, 1W, 1M all three criteria met)</b>\n\n"
+        msg += f"Stocks in this report: <b>{len(qualifying)}</b>\n\n"
+        msg += "From the 1-day stocks above, those that pass all three criteria AND have 1D, 1W, 1M all positive:\n\n"
+    else:
+        msg = time_header + "📊 <b>MarketScout — Deep Dive (1D, 1W, 1M all three criteria met)</b>\n\n"
+        msg += f"Stocks in this report: <b>{len(qualifying)}</b>\n\n"
+        msg += "Stocks below pass all three criteria AND have 1D, 1W, and 1M all positive with key financials:\n\n"
 
     # Brief pause before fetching financials (helps avoid Yahoo rate limit after stock scan)
     time.sleep(6.0)
@@ -726,7 +735,7 @@ def format_premarket_messages(
     messages = []
 
     if indices_data:
-        msg_indices = time_header + "📊 <b>MarketScout — Premarket (1/2) Indices</b>\n\n<b>🌍 Indices</b>\n"
+        msg_indices = time_header + "📊 <b>MarketScout — Premarket (1/3) Indices</b>\n\n<b>🌍 Indices</b>\n"
         for idx in indices_data:
             name = idx["name"]
             symbol = idx["symbol"]
@@ -752,10 +761,15 @@ def format_premarket_messages(
                 msg_indices += f"  {d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str} | {three_yr_str}\n\n"
         messages.append((msg_indices.strip() + SECTION_END).strip())
 
-    msg_stocks = time_header + "📊 <b>MarketScout — Premarket (2/2) Stocks (1D criteria, live premarket)</b>\n\n"
+    msg_stocks = time_header + "📊 <b>MarketScout — Premarket (2/3) Stocks (1D criteria, live premarket)</b>\n\n"
     msg_stocks += f"Stocks matching 1-day move (live premarket prices): {len(stocks_1d)}\n\n"
     msg_stocks += _format_one_stock_block(stocks_1d) + SECTION_END
     messages.append(msg_stocks.strip())
+
+    # Deep dive: from the 1-day stocks, those that fit all 3 criteria and all positive
+    msg_deep = format_deep_dive_message(stocks_1d, collection_time=collection_time, from_premarket=True)
+    if msg_deep:
+        messages.append(msg_deep)
 
     return [m for m in messages if m]
 
