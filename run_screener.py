@@ -389,7 +389,7 @@ def _fetch_stock_financial_stats(symbol: str, delay_seconds: float = 2.0) -> Opt
         "current_assets": None, "current_liabilities": None, "operating_income": None,
     }
 
-    max_attempts = 4
+    max_attempts = 6
     for attempt in range(max_attempts):
         stats = dict(empty_stats)
         try:
@@ -430,12 +430,19 @@ def _fetch_stock_financial_stats(symbol: str, delay_seconds: float = 2.0) -> Opt
                 if stats["cash_per_share"] is None and stats["total_cash"] and shares:
                     stats["cash_per_share"] = stats["total_cash"] / shares
 
-            # 3) Balance sheet (annual then quarterly)
+            # 3) Balance sheet (annual then quarterly; try get_* with freq for quarterly)
             for attr in ("balance_sheet", "quarterly_balance_sheet"):
                 try:
                     bs = getattr(t, attr, None)
                     if bs is None and attr == "balance_sheet":
                         bs = getattr(t, "get_balance_sheet", lambda: None)()
+                    if bs is None and attr == "quarterly_balance_sheet":
+                        get_bs = getattr(t, "get_balance_sheet", None)
+                        if callable(get_bs):
+                            try:
+                                bs = get_bs(freq="quarterly")
+                            except TypeError:
+                                bs = get_bs()
                     if bs is None or getattr(bs, "empty", True):
                         continue
                     v = _first_value_from_df_row(
@@ -500,7 +507,7 @@ def _fetch_stock_financial_stats(symbol: str, delay_seconds: float = 2.0) -> Opt
         except Exception as e:
             print(f"  [DEEP] Attempt {attempt + 1}/{max_attempts} for {symbol}: {e}", flush=True)
         if attempt < max_attempts - 1:
-            time.sleep(4.0 + attempt * 2)
+            time.sleep(5.0 + attempt * 3)
 
     return None
 
@@ -623,7 +630,7 @@ def format_deep_dive_message(
     msg += "Stocks below have 1D, 1W, and 1M all up (or flat) with key financials:\n\n"
 
     # Brief pause before fetching financials (helps avoid Yahoo rate limit after stock scan)
-    time.sleep(5.0)
+    time.sleep(6.0)
     for stock in sorted(qualifying, key=_pct_sort_key):
         symbol = stock["symbol"]
         company_name = stock.get("company_name", symbol)
@@ -652,9 +659,13 @@ def format_deep_dive_message(
             msg += f"  Vol: {vol_shares:.2f}M (${dollar_vol:.1f}M)\n"
         msg += "\n"
 
-        stats = _fetch_stock_financial_stats(symbol, delay_seconds=3.0)
+        stats = _fetch_stock_financial_stats(symbol, delay_seconds=4.0)
         if not stats:
-            stats = _fetch_stock_financial_stats(symbol, delay_seconds=8.0)
+            time.sleep(3.0)
+            stats = _fetch_stock_financial_stats(symbol, delay_seconds=12.0)
+        if not stats:
+            time.sleep(4.0)
+            stats = _fetch_stock_financial_stats(symbol, delay_seconds=20.0)
         if not stats:
             msg += "  (Financial data unavailable)\n\n"
             continue
@@ -784,25 +795,25 @@ def format_earnings_message(
     collection_time: Optional[str] = None,
 ) -> str:
     """
-    Format a 6th message for stocks that pass 2 of 3 criteria (1D, 1W, 1M), regardless of direction.
-    Shows next earnings date for each.
+    Stocks that appear on the report (big or rising stars) with an earnings date within the next 30 days.
     """
     non_stock = {"Crypto", "Forex", "Commodities", "ETFs"}
+    # All stocks on the report (rising stars or bigger stocks)
     qualifying = [
         r for r in all_results
         if r.get("sector") not in non_stock
-        and _criteria_count(r) >= 2
     ]
     if not qualifying:
         return ""
 
     SECTION_END = "\n\n🔵🔵🔵🔵🔵🔵🔵🔵🔵🔵"
     time_header = ("🕐 Yahoo data as of " + collection_time + "\n\n" if collection_time else "")
-    msg = time_header + "📅 <b>MarketScout — Earnings Dates (2 of 3 criteria met)</b>\n\n"
-    msg += "Stocks with upcoming earnings that passed at least 2 of 1D/1W/1M (ordered by nearest date):\n\n"
+    msg = time_header + "📅 <b>MarketScout — Earnings in the next 30 days</b>\n\n"
+    msg += "Stocks on the report (big or rising stars) with earnings in the next 30 days (ordered by nearest date):\n\n"
 
     time.sleep(1.5)
     today = datetime.now(ZoneInfo("America/New_York")).date()
+    max_days_ahead = 30
 
     def _earnings_sort_key(item):
         stock, earnings_str = item
@@ -813,12 +824,12 @@ def format_earnings_message(
             if len(parts) == 3:
                 ed = today.__class__(int(parts[0]), int(parts[1]), int(parts[2]))
                 days = (ed - today).days
-                return (0, days if days >= 0 else 999998)  # past dates before no-date
+                return (0, days if 0 <= days <= max_days_ahead else 999998)
         except (ValueError, IndexError):
             pass
         return (1, 999999)
 
-    # Fetch earnings date once per stock; keep only upcoming (future) earnings
+    # Fetch earnings date once per stock; keep only upcoming within next 30 days
     stock_dates = []
     for stock in qualifying:
         symbol = stock["symbol"]
@@ -829,7 +840,8 @@ def format_earnings_message(
             parts = earnings_date.split("-")
             if len(parts) == 3:
                 ed = today.__class__(int(parts[0]), int(parts[1]), int(parts[2]))
-                if (ed - today).days >= 0:
+                days = (ed - today).days
+                if 0 <= days <= max_days_ahead:
                     stock_dates.append((stock, earnings_date))
         except (ValueError, IndexError):
             continue
