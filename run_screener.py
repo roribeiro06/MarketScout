@@ -627,6 +627,7 @@ def format_deep_dive_message(
     SECTION_END = "\n\n🔵🔵🔵🔵🔵🔵🔵🔵🔵🔵"
     time_header = ("🕐 Yahoo data as of " + collection_time + "\n\n" if collection_time else "")
     msg = time_header + "📊 <b>MarketScout — Deep Dive (1D, 1W, 1M all positive)</b>\n\n"
+    msg += f"Stocks in this report: <b>{len(qualifying)}</b>\n\n"
     msg += "Stocks below have 1D, 1W, and 1M all up (or flat) with key financials:\n\n"
 
     # Brief pause before fetching financials (helps avoid Yahoo rate limit after stock scan)
