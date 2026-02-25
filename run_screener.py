@@ -602,42 +602,22 @@ def _format_one_stock_block(stocks: list) -> str:
 
 
 def format_deep_dive_message(
-    all_results: list,
+    qualifying: list,
     collection_time: Optional[str] = None,
-    from_premarket: bool = False,
+    title: str = "Deep Dive (1D, 1W, 1M all three criteria met)",
+    intro: str = "Stocks below pass all three criteria AND have 1D, 1W, and 1M all positive with key financials:",
 ) -> str:
     """
-    Deep dive with financial stats.
-    If from_premarket: all 1-day stocks (no filter).
-    Else: stocks that pass all 3 criteria AND all three moves positive.
+    Format a deep dive message for a list of stocks. Caller passes the qualifying list.
     """
-    Format a separate message for stocks that pass all 3 criteria positively (1D, 1W, 1M all up).
-    Includes market cap, profit margin, revenue, gross profit, cash, debt, operating CF, forward div,
-    plus balance sheet and income statement notes.
-    """
-    non_stock = {"Crypto", "Forex", "Commodities", "ETFs"}
-    if from_premarket:
-        qualifying = list(all_results)
-    else:
-        qualifying = [
-        qualifying = [
-            r for r in all_results
-            if r.get("sector") not in non_stock
-            and _all_three_pass_and_positive(r)
-        ]
     if not qualifying:
         return ""
 
     SECTION_END = "\n\n🔵🔵🔵🔵🔵🔵🔵🔵🔵🔵"
     time_header = ("🕐 Yahoo data as of " + collection_time + "\n\n" if collection_time else "")
-    if from_premarket:
-        msg = time_header + "📊 <b>MarketScout — Premarket Deep Dive (1D criteria stocks)</b>\n\n"
-        msg += f"Stocks in this report: <b>{len(qualifying)}</b>\n\n"
-        msg += "Financial details for all 1-day stocks above:\n\n"
-    else:
-        msg = time_header + "📊 <b>MarketScout — Deep Dive (1D, 1W, 1M all three criteria met)</b>\n\n"
-        msg += f"Stocks in this report: <b>{len(qualifying)}</b>\n\n"
-        msg += "Stocks below pass all three criteria AND have 1D, 1W, and 1M all positive with key financials:\n\n"
+    msg = time_header + f"📊 <b>MarketScout — {title}</b>\n\n"
+    msg += f"Stocks in this report: <b>{len(qualifying)}</b>\n\n"
+    msg += intro + "\n\n"
 
     # Brief pause before fetching financials (helps avoid Yahoo rate limit after stock scan)
     time.sleep(6.0)
@@ -771,8 +751,13 @@ def format_premarket_messages(
     msg_stocks += _format_one_stock_block(stocks_1d) + SECTION_END
     messages.append(msg_stocks.strip())
 
-    # Deep dive: from the 1-day stocks, those that fit all 3 criteria and all positive
-    msg_deep = format_deep_dive_message(stocks_1d, collection_time=collection_time, from_premarket=True)
+    # Deep dive: ALL 1-day stocks (premarket)
+    msg_deep = format_deep_dive_message(
+        stocks_1d,
+        collection_time=collection_time,
+        title="Premarket Deep Dive (1-day stocks)",
+        intro="Deep dive on all 1-day stocks above:",
+    )
     if msg_deep:
         messages.append(msg_deep)
 
@@ -1117,10 +1102,36 @@ def main() -> None:
         )
         messages = [msg_indices, msg_big, msg_rising, msg_rest]
 
-        # Deep dive: stocks that passed all 3 criteria positively (1D, 1W, 1M all up)
-        msg_deep = format_deep_dive_message(all_results, collection_time=collection_time)
-        if msg_deep:
-            messages.append(msg_deep)
+        # Deep dive 1: stocks that pass all 3 criteria AND all positive
+        non_stock = {"Crypto", "Forex", "Commodities", "ETFs"}
+        qualifying_all3 = [
+            r for r in all_results
+            if r.get("sector") not in non_stock
+            and _all_three_pass_and_positive(r)
+        ]
+        msg_deep_all3 = format_deep_dive_message(
+            qualifying_all3,
+            collection_time=collection_time,
+            title="Deep Dive — All 3 criteria + positive",
+            intro="Stocks that pass all three criteria AND have 1D, 1W, 1M all positive:",
+        )
+        if msg_deep_all3:
+            messages.append(msg_deep_all3)
+
+        # Deep dive 2: 1-day stocks only (excluding those in all-3 deep dive above)
+        stocks_1d = [
+            r for r in all_results
+            if r.get("sector") not in non_stock and r.get("passes_day")
+        ]
+        stocks_1d_only = [r for r in stocks_1d if not _all_three_pass_and_positive(r)]
+        msg_deep_1d = format_deep_dive_message(
+            stocks_1d_only,
+            collection_time=collection_time,
+            title="Deep Dive — 1-day stocks",
+            intro="1-day stocks (excluding those in the all-3-criteria deep dive above):",
+        )
+        if msg_deep_1d:
+            messages.append(msg_deep_1d)
 
         # Earnings dates: stocks that pass 2 of 3 criteria (regardless of direction)
         msg_earnings = format_earnings_message(all_results, collection_time=collection_time)
