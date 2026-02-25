@@ -242,6 +242,35 @@ def send_telegram_media_group(photo_paths: list, token: str, chat_id: str) -> No
                 f.close()
 
 
+def _get_next_delivery_target(config: dict):
+    """Return (next_target_datetime_et, index_in_list) or (None, None). Index 0 = first slot = premarket run."""
+    delivery_times = config.get("delivery_times_et") or []
+    if isinstance(delivery_times, str):
+        delivery_times = [delivery_times]
+    if not delivery_times:
+        return None, None
+    now_et = datetime.now(ZoneInfo("America/New_York"))
+    today = now_et.date()
+    next_target = None
+    next_index = None
+    for i, s in enumerate(delivery_times):
+        if not s or not isinstance(s, str):
+            continue
+        parts = s.strip().split(":")
+        if len(parts) != 2:
+            continue
+        try:
+            h, m = int(parts[0]), int(parts[1])
+            if 0 <= h <= 23 and 0 <= m <= 59:
+                target = datetime(today.year, today.month, today.day, h, m, 0, tzinfo=ZoneInfo("America/New_York"))
+                if target > now_et and (next_target is None or target < next_target):
+                    next_target = target
+                    next_index = i
+        except (ValueError, TypeError):
+            continue
+    return next_target, next_index
+
+
 def _pct_sort_key(item: dict) -> tuple:
     """Sort key: largest move in any period that fit the criteria first (by magnitude)."""
     d = item.get("one_day_pct")
@@ -610,6 +639,59 @@ def format_deep_dive_message(
     return (msg.strip() + SECTION_END).strip()
 
 
+def format_premarket_messages(
+    indices_data: Optional[List[Dict]],
+    all_results: list,
+    collection_time: Optional[str] = None,
+) -> List[str]:
+    """
+    For the first delivery slot (9:15 AM): indices + only stocks that pass 1-day criteria.
+    Uses live premarket prices (already in all_results from screener). No crypto/forex/commodities/ETFs/deep dive/earnings.
+    """
+    non_stock = {"Crypto", "Forex", "Commodities", "ETFs"}
+    stocks_1d = [
+        r for r in all_results
+        if r.get("sector") not in non_stock and r.get("passes_day")
+    ]
+    SECTION_END = "\n\n🔵🔵🔵🔵🔵🔵🔵🔵🔵🔵"
+    time_header = ("🕐 Yahoo data as of " + collection_time + "\n\n" if collection_time else "")
+    messages = []
+
+    if indices_data:
+        msg_indices = time_header + "📊 <b>MarketScout — Premarket (1/2) Indices</b>\n\n<b>🌍 Indices</b>\n"
+        for idx in indices_data:
+            name = idx["name"]
+            symbol = idx["symbol"]
+            price = idx["price"]
+            if idx.get("is_vix"):
+                d = idx.get("one_day_pct")
+                change = f"  1D: {d:+.2f}" if d is not None else ""
+                msg_indices += f"<b>{html.escape(name)} ({symbol})</b> {price:.2f}{change}\n\n"
+            else:
+                d = idx.get("one_day_pct")
+                w = idx.get("one_week_pct")
+                m = idx.get("one_month_pct")
+                six = idx.get("one_6m_pct")
+                one_yr = idx.get("one_year_pct")
+                three_yr = idx.get("three_year_pct")
+                d_str = f"1D: {d:+.2f}" if d is not None else "1D: —"
+                w_str = f"1W: {w:+.2f}" if w is not None else "1W: —"
+                m_str = f"1M: {m:+.2f}" if m is not None else "1M: —"
+                six_str = f"6M: {six:+.2f}" if six is not None else "6M: —"
+                one_yr_str = f"1Y: {one_yr:+.2f}" if one_yr is not None else "1Y: —"
+                three_yr_str = f"3Y: {three_yr:+.2f}" if three_yr is not None else "3Y: —"
+                msg_indices += f"<b>{html.escape(name)} ({symbol})</b> {price:.2f}\n"
+                msg_indices += f"  {d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str} | {three_yr_str}\n\n"
+        messages.append((msg_indices.strip() + SECTION_END).strip())
+
+    msg_stocks = time_header + "📊 <b>MarketScout — Premarket (2/2) Stocks (1D criteria, live premarket)</b>\n\n"
+    msg_stocks += f"Stocks matching 1-day move (live premarket prices): {len(stocks_1d)}\n\n"
+    msg_stocks += _format_one_stock_block(stocks_1d) + SECTION_END
+    messages.append(msg_stocks.strip())
+
+    return [m for m in messages if m]
+
+
 def _criteria_count(r: dict) -> int:
     """Count how many of 1D, 1W, 1M criteria the asset passes."""
     return sum(1 for k in ("passes_day", "passes_week", "passes_month") if r.get(k))
@@ -880,6 +962,9 @@ def main() -> None:
     # Load configuration
     config = load_config("config.yaml")
     
+    # Determine which delivery slot we're in (0 = first = premarket: only indices + 1D stocks at 9:15)
+    next_delivery_target, delivery_slot_index = _get_next_delivery_target(config)
+    
     # Check if dry-run mode
     dry_run = config.get("dry_run", False)
 
@@ -927,28 +1012,32 @@ def main() -> None:
     commodity_count = len(commodity_results)
     etf_count = len(etf_results)
     
-    # Format into 4 messages: (1) Indices, (2) Big stocks, (3) Rising stars, (4) Crypto+Commodities+Forex+ETFs
-    msg_indices, msg_big, msg_rising, msg_rest = format_stock_message(
-        all_results,
-        crypto_count=crypto_count,
-        forex_count=forex_count,
-        commodity_count=commodity_count,
-        etf_count=etf_count,
-        indices_data=indices_data,
-        etf_asset_class_order=config.get("etf_asset_class_order"),
-        collection_time=collection_time,
-    )
-    messages = [msg_indices, msg_big, msg_rising, msg_rest]
+    # Premarket run (first delivery slot): only indices + stocks that pass 1-day criteria (live premarket prices)
+    if delivery_slot_index == 0 and next_delivery_target is not None:
+        messages = format_premarket_messages(indices_data, all_results, collection_time=collection_time)
+    else:
+        # Full report: 4 messages + optional deep dive + earnings
+        msg_indices, msg_big, msg_rising, msg_rest = format_stock_message(
+            all_results,
+            crypto_count=crypto_count,
+            forex_count=forex_count,
+            commodity_count=commodity_count,
+            etf_count=etf_count,
+            indices_data=indices_data,
+            etf_asset_class_order=config.get("etf_asset_class_order"),
+            collection_time=collection_time,
+        )
+        messages = [msg_indices, msg_big, msg_rising, msg_rest]
 
-    # Deep dive: stocks that passed all 3 criteria positively (1D, 1W, 1M all up)
-    msg_deep = format_deep_dive_message(all_results, collection_time=collection_time)
-    if msg_deep:
-        messages.append(msg_deep)
+        # Deep dive: stocks that passed all 3 criteria positively (1D, 1W, 1M all up)
+        msg_deep = format_deep_dive_message(all_results, collection_time=collection_time)
+        if msg_deep:
+            messages.append(msg_deep)
 
-    # Earnings dates: stocks that pass 2 of 3 criteria (regardless of direction)
-    msg_earnings = format_earnings_message(all_results, collection_time=collection_time)
-    if msg_earnings:
-        messages.append(msg_earnings)
+        # Earnings dates: stocks that pass 2 of 3 criteria (regardless of direction)
+        msg_earnings = format_earnings_message(all_results, collection_time=collection_time)
+        if msg_earnings:
+            messages.append(msg_earnings)
 
     messages = [m for m in messages if m]
 
@@ -972,59 +1061,40 @@ def main() -> None:
             print("Warning: TELEGRAM_CHAT_ID should be numeric (e.g. 123456789 or -1001234567890 for groups).", flush=True)
 
         # If delivery_times_et is set, wait until the next target time today (Eastern) before sending
-        delivery_times = config.get("delivery_times_et") or []
-        if isinstance(delivery_times, str):
-            delivery_times = [delivery_times]
-        if delivery_times:
+        if next_delivery_target is not None:
             now_et = datetime.now(ZoneInfo("America/New_York"))
-            today = now_et.date()
-            next_target = None
-            for s in delivery_times:
-                if not s or not isinstance(s, str):
-                    continue
-                parts = s.strip().split(":")
-                if len(parts) != 2:
-                    continue
-                try:
-                    h, m = int(parts[0]), int(parts[1])
-                    if 0 <= h <= 23 and 0 <= m <= 59:
-                        target = datetime(today.year, today.month, today.day, h, m, 0, tzinfo=ZoneInfo("America/New_York"))
-                        if target > now_et and (next_target is None or target < next_target):
-                            next_target = target
-                except (ValueError, TypeError):
-                    continue
-            if next_target is not None:
-                wait_sec = (next_target - now_et).total_seconds()
-                if wait_sec > 0:
-                    print(f"Waiting until {next_target.strftime('%H:%M')} ET to send ({wait_sec:.0f}s)...", flush=True)
-                    time.sleep(wait_sec)
+            wait_sec = (next_delivery_target - now_et).total_seconds()
+            if wait_sec > 0:
+                print(f"Waiting until {next_delivery_target.strftime('%H:%M')} ET to send ({wait_sec:.0f}s)...", flush=True)
+                time.sleep(wait_sec)
 
         for msg in messages:
             send_telegram_message(msg, token, chat_id)
         print(f"\nTelegram notification sent ({len(messages)} messages): {len(results)} stock(s), {len(rising_stars_results)} rising star(s), {etf_count} ETF(s), {crypto_count} crypto, {forex_count} forex, {commodity_count} commodities")
         
-        # Generate and send charts only for assets that pass at least 2 of 3 criteria (1D, 1W, 1M)
-        results_for_charts = [r for r in all_results if _criteria_count(r) >= 2]
-        print(f"  Assets with 2+ criteria (for charts): {len(results_for_charts)}")
-        if results_for_charts:
-            print("Generating charts...")
-            charts = generate_charts_for_results(results_for_charts, config)
-            
-            if charts:
-                chart_paths = [chart_info["chart_path"] for chart_info in charts]
-                try:
-                    send_telegram_media_group(chart_paths, token, chat_id)
-                    print(f"  Charts sent as media group ({len(charts)} charts)")
-                except Exception as e:
-                    print(f"  Error sending charts: {e}")
+        # Charts only for full report (not premarket)
+        if delivery_slot_index != 0:
+            results_for_charts = [r for r in all_results if _criteria_count(r) >= 2]
+            print(f"  Assets with 2+ criteria (for charts): {len(results_for_charts)}")
+            if results_for_charts:
+                print("Generating charts...")
+                charts = generate_charts_for_results(results_for_charts, config)
                 
-                # Clean up chart files
-                for chart_info in charts:
+                if charts:
+                    chart_paths = [chart_info["chart_path"] for chart_info in charts]
                     try:
-                        if os.path.exists(chart_info["chart_path"]):
-                            os.remove(chart_info["chart_path"])
+                        send_telegram_media_group(chart_paths, token, chat_id)
+                        print(f"  Charts sent as media group ({len(charts)} charts)")
                     except Exception as e:
-                        print(f"  Error cleaning up chart {chart_info['symbol']}: {e}")
+                        print(f"  Error sending charts: {e}")
+                    
+                    # Clean up chart files
+                    for chart_info in charts:
+                        try:
+                            if os.path.exists(chart_info["chart_path"]):
+                                os.remove(chart_info["chart_path"])
+                        except Exception as e:
+                            print(f"  Error cleaning up chart {chart_info['symbol']}: {e}")
 
 
 if __name__ == "__main__":
