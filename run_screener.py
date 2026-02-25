@@ -268,18 +268,20 @@ def _all_three_pass(item: dict) -> bool:
 
 def _all_three_positive(item: dict) -> bool:
     """True if asset passes 1D, 1W, and 1M criteria and all moved up (positive).
-    Uses >= 0 so rounding (e.g. 0.004 -> 0.00) doesn't exclude; allows >= -0.01 for rounding tolerance."""
+    Uses >= -0.01 for rounding; if a pct is None we still include (e.g. edge cases)."""
     if not _all_three_pass(item):
         return False
     d = item.get("one_day_pct")
     w = item.get("one_week_pct")
     m = item.get("one_month_pct")
-    # Allow 0 or tiny negative (rounding); still must pass thresholds above
-    return (
-        d is not None and d >= -0.01
-        and w is not None and w >= -0.01
-        and m is not None and m >= -0.01
-    )
+    # When present, must be >= -0.01; when None (edge case), don't disqualify
+    if d is not None and d < -0.01:
+        return False
+    if w is not None and w < -0.01:
+        return False
+    if m is not None and m < -0.01:
+        return False
+    return True
 
 
 def _format_big_num(x: Optional[float]) -> str:
