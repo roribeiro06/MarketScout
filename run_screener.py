@@ -663,7 +663,11 @@ def format_deep_dive_message(
         # Core stats
         msg += f"  Market cap: {_format_big_num(stats['market_cap'])}\n"
         pm = stats.get("profit_margin")
-        msg += f"  Profit margin: {pm*100:.1f}%\n" if pm is not None else "  Profit margin: —\n"
+        if pm is not None and isinstance(pm, (int, float)) and pm == pm:
+            pm_pct = (pm * 100) if abs(pm) < 1.1 else pm  # Yahoo: decimal (0.15) or already % (15)
+            msg += f"  Profit margin: {pm_pct:.1f}%\n"
+        else:
+            msg += "  Profit margin: —\n"
         rev = stats.get("total_revenue")
         rps = stats.get("revenue_per_share")
         msg += f"  Revenue: {_format_big_num(rev)}" + (f" (${rps:.2f}/share)" if rps is not None else "") + "\n"
@@ -1118,16 +1122,17 @@ def main() -> None:
         if msg_deep_all3:
             messages.append(msg_deep_all3)
 
-        # Deep dive 2: all 1-day stocks (separate from all-3-criteria deep dive above)
+        # Deep dive 2: 1-day stocks only (excluding those in all-3 deep dive above)
         stocks_1d = [
             r for r in all_results
             if r.get("sector") not in non_stock and r.get("passes_day")
         ]
+        stocks_1d_only = [r for r in stocks_1d if not _all_three_pass_and_positive(r)]
         msg_deep_1d = format_deep_dive_message(
-            stocks_1d,
+            stocks_1d_only,
             collection_time=collection_time,
             title="Deep Dive — 1-day stocks",
-            intro="Stocks matching 1-day criteria (separate from all-3-criteria deep dive above):",
+            intro="1-day stocks (excluding those in the all-3-criteria deep dive above):",
         )
         if msg_deep_1d:
             messages.append(msg_deep_1d)
