@@ -342,9 +342,32 @@ def _format_big_num(x: Optional[float]) -> str:
     return f"${x:.2f}"
 
 
+def _first_value_from_df_row(df, *row_labels):
+    """Get first numeric value from a DataFrame row (row = line item, columns = dates). Returns None if not found."""
+    if df is None or getattr(df, "empty", True) or not hasattr(df, "index"):
+        return None
+    for label in row_labels:
+        if label not in df.index:
+            continue
+        try:
+            row = df.loc[label]
+            if hasattr(row, "iloc"):
+                for i in range(len(row)):
+                    val = row.iloc[i]
+                    if val is not None and isinstance(val, (int, float)) and val == val:  # not nan
+                        return float(val)
+            elif len(row):
+                val = row[0] if hasattr(row, "__getitem__") else None
+                if val is not None and isinstance(val, (int, float)) and val == val:
+                    return float(val)
+        except Exception:
+            pass
+    return None
+
+
 def _fetch_stock_financial_stats(symbol: str, delay_seconds: float = 2.0) -> Optional[Dict]:
     """Fetch financial stats for a stock from yfinance. Returns dict or None on total failure.
-    Fills stats step-by-step so one failing step doesn't leave us with empty dict."""
+    Tries info, fast_info, balance_sheet, income_stmt, cashflow and quarterly variants with retries."""
     time.sleep(delay_seconds)
 
     def _get(info_dict: dict, k: str, default=None):
@@ -366,24 +389,38 @@ def _fetch_stock_financial_stats(symbol: str, delay_seconds: float = 2.0) -> Opt
         "current_assets": None, "current_liabilities": None, "operating_income": None,
     }
 
-    for attempt in range(3):
+    max_attempts = 4
+    for attempt in range(max_attempts):
         stats = dict(empty_stats)
         try:
             t = yf.Ticker(symbol)
+
+            # 1) fast_info first (lightweight, often works when info is throttled)
+            try:
+                fast = getattr(t, "fast_info", None)
+                if fast is not None:
+                    mc = getattr(fast, "market_cap", None)
+                    if mc is not None:
+                        stats["market_cap"] = float(mc)
+            except Exception:
+                pass
+
+            # 2) info dict (can be empty or partial under rate limit)
             info = None
             try:
                 info = t.info
             except Exception:
                 pass
-            if isinstance(info, dict) and info:
+            if isinstance(info, dict) and len(info) > 2:
                 shares = _get(info, "sharesOutstanding") or _get(info, "impliedSharesOutstanding")
-                stats["market_cap"] = _get(info, "marketCap")
+                if stats["market_cap"] is None:
+                    stats["market_cap"] = _get(info, "marketCap") or _get(info, "enterpriseValue")
                 stats["profit_margin"] = _get(info, "profitMargins")
                 stats["total_revenue"] = _get(info, "totalRevenue")
                 stats["gross_profit"] = _get(info, "grossProfits")
                 stats["total_cash"] = _get(info, "totalCash") or _get(info, "cash")
                 stats["total_debt"] = _get(info, "totalDebt")
-                stats["operating_cashflow"] = _get(info, "operatingCashflow")
+                stats["operating_cashflow"] = _get(info, "operatingCashflow") or _get(info, "freeCashflow")
                 stats["forward_dividend"] = _get(info, "forwardDividendRate") or _get(info, "dividendRate")
                 stats["dividend_yield"] = _get(info, "dividendYield")
                 stats["revenue_per_share"] = _get(info, "revenuePerShare")
@@ -392,54 +429,78 @@ def _fetch_stock_financial_stats(symbol: str, delay_seconds: float = 2.0) -> Opt
                 stats["cash_per_share"] = _get(info, "totalCashPerShare")
                 if stats["cash_per_share"] is None and stats["total_cash"] and shares:
                     stats["cash_per_share"] = stats["total_cash"] / shares
-            if stats["market_cap"] is None:
+
+            # 3) Balance sheet (annual then quarterly)
+            for attr in ("balance_sheet", "quarterly_balance_sheet"):
                 try:
-                    fast = getattr(t, "fast_info", None)
-                    if fast is not None:
-                        mc = getattr(fast, "market_cap", None)
-                        if mc is not None:
-                            stats["market_cap"] = float(mc)
+                    bs = getattr(t, attr, None)
+                    if bs is None and attr == "balance_sheet":
+                        bs = getattr(t, "get_balance_sheet", lambda: None)()
+                    if bs is None or getattr(bs, "empty", True):
+                        continue
+                    v = _first_value_from_df_row(
+                        bs, "Total Current Assets", "Current Assets", "Current Assets And Other"
+                    )
+                    if v is not None:
+                        stats["current_assets"] = stats["current_assets"] or v
+                    v = _first_value_from_df_row(
+                        bs, "Total Current Liabilities", "Current Liabilities", "Current Liabilities And Other"
+                    )
+                    if v is not None:
+                        stats["current_liabilities"] = stats["current_liabilities"] or v
+                    if stats["current_assets"] is not None and stats["current_liabilities"] is not None:
+                        break
                 except Exception:
                     pass
-            try:
-                bs = getattr(t, "balance_sheet", None)
-                if bs is not None and not getattr(bs, "empty", True) and hasattr(bs, "index"):
-                    for label in ["Total Current Assets", "Current Assets", "Total Current Liabilities", "Current Liabilities"]:
-                        if label in bs.index:
-                            row = bs.loc[label]
-                            val = row.iloc[0] if hasattr(row, "iloc") and len(row) else (row[0] if len(row) else None)
-                            if val is not None and not (isinstance(val, float) and (val != val)):
-                                try:
-                                    fval = float(val)
-                                    if "Asset" in label:
-                                        stats["current_assets"] = stats["current_assets"] or fval
-                                    else:
-                                        stats["current_liabilities"] = stats["current_liabilities"] or fval
-                                except (TypeError, ValueError):
-                                    pass
-            except Exception:
-                pass
-            try:
-                inc = getattr(t, "income_stmt", None)
-                if inc is not None and not getattr(inc, "empty", True) and hasattr(inc, "index"):
-                    for label in ["Operating Income", "Operating Income Loss", "Total Operating Income As Reported"]:
-                        if label in inc.index:
-                            row = inc.loc[label]
-                            val = row.iloc[0] if hasattr(row, "iloc") and len(row) else (row[0] if len(row) else None)
-                            if val is not None and not (isinstance(val, float) and (val != val)):
-                                try:
-                                    stats["operating_income"] = float(val)
-                                    break
-                                except (TypeError, ValueError):
-                                    pass
-            except Exception:
-                pass
+
+            # 4) Income statement (annual then quarterly)
+            for attr in ("income_stmt", "quarterly_income_stmt"):
+                try:
+                    inc = getattr(t, attr, None)
+                    if inc is None and attr == "income_stmt":
+                        inc = getattr(t, "get_income_stmt", lambda: None)()
+                    if inc is None or getattr(inc, "empty", True):
+                        continue
+                    v = _first_value_from_df_row(
+                        inc,
+                        "Operating Income",
+                        "Operating Income Loss",
+                        "Total Operating Income As Reported",
+                        "EBIT",
+                    )
+                    if v is not None:
+                        stats["operating_income"] = stats["operating_income"] or v
+                        break
+                except Exception:
+                    pass
+
+            # 5) Cash flow for operating cash flow if still missing
+            if stats["operating_cashflow"] is None:
+                for attr in ("cashflow", "quarterly_cashflow"):
+                    try:
+                        cf = getattr(t, attr, None)
+                        if cf is None and attr == "cashflow":
+                            cf = getattr(t, "get_cashflow", lambda: None)()
+                        if cf is None or getattr(cf, "empty", True):
+                            continue
+                        v = _first_value_from_df_row(
+                            cf,
+                            "Operating Cash Flow",
+                            "Cash Flow From Continuing Operating Activities",
+                            "Operating Cash Flow",
+                        )
+                        if v is not None:
+                            stats["operating_cashflow"] = v
+                            break
+                    except Exception:
+                        pass
+
             if any(v is not None for v in stats.values()):
                 return stats
         except Exception as e:
-            print(f"  [DEEP] Attempt {attempt + 1} for {symbol}: {e}")
-            if attempt < 2:
-                time.sleep(3.0 + attempt)
+            print(f"  [DEEP] Attempt {attempt + 1}/{max_attempts} for {symbol}: {e}", flush=True)
+        if attempt < max_attempts - 1:
+            time.sleep(4.0 + attempt * 2)
 
     return None
 
@@ -562,7 +623,7 @@ def format_deep_dive_message(
     msg += "Stocks below have 1D, 1W, and 1M all up (or flat) with key financials:\n\n"
 
     # Brief pause before fetching financials (helps avoid Yahoo rate limit after stock scan)
-    time.sleep(3.0)
+    time.sleep(5.0)
     for stock in sorted(qualifying, key=_pct_sort_key):
         symbol = stock["symbol"]
         company_name = stock.get("company_name", symbol)
@@ -591,9 +652,9 @@ def format_deep_dive_message(
             msg += f"  Vol: {vol_shares:.2f}M (${dollar_vol:.1f}M)\n"
         msg += "\n"
 
-        stats = _fetch_stock_financial_stats(symbol, delay_seconds=2.5)
+        stats = _fetch_stock_financial_stats(symbol, delay_seconds=3.0)
         if not stats:
-            stats = _fetch_stock_financial_stats(symbol, delay_seconds=5.0)
+            stats = _fetch_stock_financial_stats(symbol, delay_seconds=8.0)
         if not stats:
             msg += "  (Financial data unavailable)\n\n"
             continue
