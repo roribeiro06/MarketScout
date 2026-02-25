@@ -3,10 +3,10 @@ name: MarketScout Telegram notifications
 on:
   workflow_dispatch:
   schedule:
-    # UTC times for 9:35, 13:00, 16:05 Eastern (EDT=UTC-4: 13:35,17:00,20:05 | EST=UTC-5: 14:35,18:00,21:05)
-    - cron: "35 13 * * *"   # 09:35 EDT / 08:35 EST
-    - cron: "0 17 * * *"    # 13:00 EDT / 12:00 EST
-    - cron: "5 20 * * *"    # 16:05 EDT / 15:05 EST
+    # Start job ~1h before delivery so report is ready; script waits until delivery time then sends
+    - cron: "0 12 * * *"   # Start 8:00 AM EDT → deliver at 9:35 AM ET
+    - cron: "0 16 * * *"   # Start 12:00 PM EDT → deliver at 1:00 PM ET
+    - cron: "5 19 * * *"   # Start 3:05 PM EDT → deliver at 4:05 PM ET
 
 jobs:
   run-screener:

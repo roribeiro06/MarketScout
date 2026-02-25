@@ -254,6 +254,13 @@ run_profile: morning_scan
 # Dry-run mode: when true, do not hit Telegram API, just log
 dry_run: false
 
+# Optional: deliver at these Eastern times (HH:MM). Job should start ~1h before so report is ready in time.
+# Example: job starts 8:00 AM ET, report ready by 9:00, then wait until 9:35 to send.
+delivery_times_et:
+  - "09:35"
+  - "13:00"
+  - "16:05"
+
 # Paths
 paths:
   data_dir: data

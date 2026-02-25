@@ -971,6 +971,34 @@ def main() -> None:
         if not chat_id.lstrip("-").isdigit():
             print("Warning: TELEGRAM_CHAT_ID should be numeric (e.g. 123456789 or -1001234567890 for groups).", flush=True)
 
+        # If delivery_times_et is set, wait until the next target time today (Eastern) before sending
+        delivery_times = config.get("delivery_times_et") or []
+        if isinstance(delivery_times, str):
+            delivery_times = [delivery_times]
+        if delivery_times:
+            now_et = datetime.now(ZoneInfo("America/New_York"))
+            today = now_et.date()
+            next_target = None
+            for s in delivery_times:
+                if not s or not isinstance(s, str):
+                    continue
+                parts = s.strip().split(":")
+                if len(parts) != 2:
+                    continue
+                try:
+                    h, m = int(parts[0]), int(parts[1])
+                    if 0 <= h <= 23 and 0 <= m <= 59:
+                        target = datetime(today.year, today.month, today.day, h, m, 0, tzinfo=ZoneInfo("America/New_York"))
+                        if target > now_et and (next_target is None or target < next_target):
+                            next_target = target
+                except (ValueError, TypeError):
+                    continue
+            if next_target is not None:
+                wait_sec = (next_target - now_et).total_seconds()
+                if wait_sec > 0:
+                    print(f"Waiting until {next_target.strftime('%H:%M')} ET to send ({wait_sec:.0f}s)...", flush=True)
+                    time.sleep(wait_sec)
+
         for msg in messages:
             send_telegram_message(msg, token, chat_id)
         print(f"\nTelegram notification sent ({len(messages)} messages): {len(results)} stock(s), {len(rising_stars_results)} rising star(s), {etf_count} ETF(s), {crypto_count} crypto, {forex_count} forex, {commodity_count} commodities")
