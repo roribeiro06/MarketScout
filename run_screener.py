@@ -1118,17 +1118,16 @@ def main() -> None:
         if msg_deep_all3:
             messages.append(msg_deep_all3)
 
-        # Deep dive 2: 1-day stocks only (excluding those in all-3 deep dive above)
+        # Deep dive 2: all 1-day stocks (separate from all-3-criteria deep dive above)
         stocks_1d = [
             r for r in all_results
             if r.get("sector") not in non_stock and r.get("passes_day")
         ]
-        stocks_1d_only = [r for r in stocks_1d if not _all_three_pass_and_positive(r)]
         msg_deep_1d = format_deep_dive_message(
-            stocks_1d_only,
+            stocks_1d,
             collection_time=collection_time,
             title="Deep Dive — 1-day stocks",
-            intro="1-day stocks (excluding those in the all-3-criteria deep dive above):",
+            intro="Stocks that match 1-day criteria with key financials (separate from all-3-criteria deep dive above):",
         )
         if msg_deep_1d:
             messages.append(msg_deep_1d)
