@@ -182,6 +182,7 @@ def _evaluate_stock_data(
     # Get current volume and price (single day — so you can see when one day triggers high volume)
     current_volume = data["Volume"].iloc[-1]
     current_price = data["Close"].iloc[-1]
+    prev_close = data["Close"].iloc[-2] if len(data) >= 2 else current_price
     dollar_volume = current_price * current_volume
     
     # Check thresholds: symmetric (one_*_pct_abs) or asymmetric (one_*_pct_high / one_*_pct_low)
@@ -211,6 +212,7 @@ def _evaluate_stock_data(
         sector = override_sector if override_sector is not None else "Other"
         display_sector = None
         target_price = None
+        live_price = None
         if override_sector is None:
             try:
                 ticker = yf.Ticker(symbol)
@@ -224,6 +226,7 @@ def _evaluate_stock_data(
                 t = info.get("targetMeanPrice")
                 if t is not None and isinstance(t, (int, float)):
                     target_price = round(float(t), 2)
+                live_price = info.get("preMarketPrice") or info.get("regularMarketPrice") or info.get("currentPrice")
             except Exception:
                 pass  # Use symbol as fallback
         else:
@@ -240,7 +243,19 @@ def _evaluate_stock_data(
                 t = info.get("targetMeanPrice")
                 if t is not None and isinstance(t, (int, float)):
                     target_price = round(float(t), 2)
+                live_price = info.get("preMarketPrice") or info.get("regularMarketPrice") or info.get("currentPrice")
             except Exception:
+                pass
+
+        # Overlay live/pre-market price when available (so 9:30 AM report shows current quote, not just prior close)
+        if live_price is not None and isinstance(live_price, (int, float)) and prev_close and prev_close > 0:
+            try:
+                p = float(live_price)
+                if p > 0:
+                    current_price = p
+                    one_day_change = ((current_price - prev_close) / prev_close) * 100
+                    passes_day = _passes_pct(one_day_change, "one_day_pct_high", "one_day_pct_low", "one_day_pct_abs")
+            except (TypeError, ValueError):
                 pass
 
         out = {

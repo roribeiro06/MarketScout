@@ -51,7 +51,7 @@ COMMODITY_CONTRACT_SIZE = {
 
 
 def get_indices_snapshot() -> List[Dict]:
-    """Fetch current level and 1D/1W/1M/6M/1Y/3Y % changes for indices. VIX has 1D only."""
+    """Fetch current level and 1D/1W/1M/6M/1Y/3Y % changes for indices. Uses live/pre-market price when available."""
     out = []
     for symbol, name in INDICES:
         try:
@@ -60,6 +60,7 @@ def get_indices_snapshot() -> List[Dict]:
             if data is None or len(data) < 2:
                 continue
             price = round(float(data["Close"].iloc[-1]), 2)
+            prev_close = float(data["Close"].iloc[-2])
             one_d = None
             one_w = None
             one_m = None
@@ -67,8 +68,7 @@ def get_indices_snapshot() -> List[Dict]:
             one_1y = None
             one_3y = None
             if len(data) >= 2:
-                p0 = data["Close"].iloc[-2]
-                one_d = ((data["Close"].iloc[-1] - p0) / p0) * 100
+                one_d = ((data["Close"].iloc[-1] - prev_close) / prev_close) * 100
             if len(data) >= 6:
                 p5 = data["Close"].iloc[-6]
                 one_w = ((data["Close"].iloc[-1] - p5) / p5) * 100
@@ -87,6 +87,17 @@ def get_indices_snapshot() -> List[Dict]:
                 n_3y = min(756, len(data) - 1)
                 p_3y = data["Close"].iloc[-(n_3y + 1)]
                 one_3y = ((data["Close"].iloc[-1] - p_3y) / p_3y) * 100
+            # Overlay live/pre-market price when available
+            try:
+                info = ticker.info
+                live = info.get("preMarketPrice") or info.get("regularMarketPrice") or info.get("currentPrice")
+                if live is not None and isinstance(live, (int, float)) and prev_close and prev_close > 0:
+                    p = float(live)
+                    if p > 0:
+                        price = round(p, 2)
+                        one_d = ((p - prev_close) / prev_close) * 100
+            except Exception:
+                pass
             out.append({
                 "symbol": symbol,
                 "name": name,
