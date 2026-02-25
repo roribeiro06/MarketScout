@@ -306,21 +306,16 @@ def _all_three_pass(item: dict) -> bool:
     )
 
 
-def _all_three_positive(item: dict) -> bool:
-    """True if asset is in the report (passed at least one of 1D/1W/1M) and all three moves are non-negative.
-    Deep dive uses this: include any stock with 1D, 1W, 1M all up (or flat), not only those that passed all three thresholds."""
-    if not (item.get("passes_day") or item.get("passes_week") or item.get("passes_month")):
+def _all_three_pass_and_positive(item: dict) -> bool:
+    """True if asset passes all 3 criteria AND all three moves (1D, 1W, 1M) are positive."""
+    if not _all_three_pass(item):
         return False
     d = item.get("one_day_pct")
     w = item.get("one_week_pct")
     m = item.get("one_month_pct")
-    if d is not None and d < -0.01:
+    if d is None or w is None or m is None:
         return False
-    if w is not None and w < -0.01:
-        return False
-    if m is not None and m < -0.01:
-        return False
-    return True
+    return d > 0 and w > 0 and m > 0
 
 
 def _format_big_num(x: Optional[float]) -> str:
@@ -619,7 +614,7 @@ def format_deep_dive_message(
     qualifying = [
         r for r in all_results
         if r.get("sector") not in non_stock
-        and _all_three_pass(r)
+        and _all_three_pass_and_positive(r)
     ]
     if not qualifying:
         return ""
@@ -628,7 +623,7 @@ def format_deep_dive_message(
     time_header = ("🕐 Yahoo data as of " + collection_time + "\n\n" if collection_time else "")
     msg = time_header + "📊 <b>MarketScout — Deep Dive (1D, 1W, 1M all three criteria met)</b>\n\n"
     msg += f"Stocks in this report: <b>{len(qualifying)}</b>\n\n"
-    msg += "Stocks below pass all three criteria (1D, 1W, and 1M) with key financials:\n\n"
+    msg += "Stocks below pass all three criteria AND have 1D, 1W, and 1M all positive with key financials:\n\n"
 
     # Brief pause before fetching financials (helps avoid Yahoo rate limit after stock scan)
     time.sleep(6.0)
