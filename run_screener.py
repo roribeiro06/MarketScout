@@ -1127,7 +1127,7 @@ def main() -> None:
             stocks_1d,
             collection_time=collection_time,
             title="Deep Dive — 1-day stocks",
-            intro="Stocks that match 1-day criteria with key financials (separate from all-3-criteria deep dive above):",
+            intro="Stocks matching 1-day criteria (separate from all-3-criteria deep dive above):",
         )
         if msg_deep_1d:
             messages.append(msg_deep_1d)
