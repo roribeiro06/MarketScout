@@ -724,7 +724,7 @@ def format_premarket_messages(
     messages = []
 
     if indices_data:
-        msg_indices = time_header + "📊 <b>MarketScout — Premarket (1/3) Indices</b>\n\n<b>🌍 Indices</b>\n"
+        msg_indices = time_header + "📊 <b>MarketScout — Premarket (1/2) Indices</b>\n\n<b>🌍 Indices</b>\n"
         for idx in indices_data:
             name = idx["name"]
             symbol = idx["symbol"]
@@ -750,20 +750,10 @@ def format_premarket_messages(
                 msg_indices += f"  {d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str} | {three_yr_str}\n\n"
         messages.append((msg_indices.strip() + SECTION_END).strip())
 
-    msg_stocks = time_header + "📊 <b>MarketScout — Premarket (2/3) Stocks (1D criteria, live premarket)</b>\n\n"
+    msg_stocks = time_header + "📊 <b>MarketScout — Premarket (2/2) Stocks (1D criteria, live premarket)</b>\n\n"
     msg_stocks += f"Stocks matching 1-day move (live premarket prices): {len(stocks_1d)}\n\n"
     msg_stocks += _format_one_stock_block(stocks_1d) + SECTION_END
     messages.append(msg_stocks.strip())
-
-    # Deep dive: ALL 1-day stocks (premarket)
-    msg_deep = format_deep_dive_message(
-        stocks_1d,
-        collection_time=collection_time,
-        title="Premarket Deep Dive (1-day stocks)",
-        intro="Deep dive on all 1-day stocks above:",
-    )
-    if msg_deep:
-        messages.append(msg_deep)
 
     return [m for m in messages if m]
 
@@ -1042,6 +1032,13 @@ def main() -> None:
     # Determine which delivery slot we're in (0 = first = premarket: only indices + 1D stocks at 9:15)
     next_delivery_target, delivery_slot_index = _get_next_delivery_target(config)
     
+    # Manual trigger: send Report 1 (premarket) right now with current data (premarket/live prices)
+    force_report_1 = (os.getenv("MARKETSCOUT_REPORT_1") or "").strip().lower() in ("1", "true", "yes")
+    if force_report_1:
+        delivery_slot_index = 0
+        next_delivery_target = None  # send immediately, no wait
+        print("MARKETSCOUT_REPORT_1=1: building Report 1 (premarket) and sending immediately.", flush=True)
+    
     # Check if dry-run mode
     dry_run = config.get("dry_run", False)
 
@@ -1090,7 +1087,7 @@ def main() -> None:
     etf_count = len(etf_results)
     
     # Premarket run (first delivery slot): only indices + stocks that pass 1-day criteria (live premarket prices)
-    if delivery_slot_index == 0 and next_delivery_target is not None:
+    if delivery_slot_index == 0:
         messages = format_premarket_messages(indices_data, all_results, collection_time=collection_time)
     else:
         # Full report: 4 messages + optional deep dive + earnings
@@ -1106,38 +1103,7 @@ def main() -> None:
         )
         messages = [msg_indices, msg_big, msg_rising, msg_rest]
 
-        # Deep dive 1: stocks that pass all 3 criteria AND all positive
-        non_stock = {"Crypto", "Forex", "Commodities", "ETFs"}
-        qualifying_all3 = [
-            r for r in all_results
-            if r.get("sector") not in non_stock
-            and _all_three_pass_and_positive(r)
-        ]
-        msg_deep_all3 = format_deep_dive_message(
-            qualifying_all3,
-            collection_time=collection_time,
-            title="Deep Dive — All 3 criteria + positive",
-            intro="Stocks that pass all three criteria AND have 1D, 1W, 1M all positive:",
-        )
-        if msg_deep_all3:
-            messages.append(msg_deep_all3)
-
-        # Deep dive 2: 1-day stocks only (excluding those in all-3 deep dive above)
-        stocks_1d = [
-            r for r in all_results
-            if r.get("sector") not in non_stock and r.get("passes_day")
-        ]
-        stocks_1d_only = [r for r in stocks_1d if not _all_three_pass_and_positive(r)]
-        msg_deep_1d = format_deep_dive_message(
-            stocks_1d_only,
-            collection_time=collection_time,
-            title="Deep Dive — 1-day stocks",
-            intro="1-day stocks (excluding those in the all-3-criteria deep dive above):",
-        )
-        if msg_deep_1d:
-            messages.append(msg_deep_1d)
-
-        # Earnings dates: stocks that pass 2 of 3 criteria (regardless of direction)
+        # Earnings dates
         msg_earnings = format_earnings_message(all_results, collection_time=collection_time)
         if msg_earnings:
             messages.append(msg_earnings)
@@ -1164,7 +1130,9 @@ def main() -> None:
             print("Warning: TELEGRAM_CHAT_ID should be numeric (e.g. 123456789 or -1001234567890 for groups).", flush=True)
 
         # If delivery_times_et is set, wait until the next target time today (Eastern) before sending
-        if next_delivery_target is not None:
+        # Set env MARKETSCOUT_SEND_NOW=1 to skip wait and send immediately (e.g. when testing manually).
+        send_now = (os.getenv("MARKETSCOUT_SEND_NOW") or "").strip().lower() in ("1", "true", "yes")
+        if not send_now and next_delivery_target is not None:
             now_et = datetime.now(ZoneInfo("America/New_York"))
             wait_sec = (next_delivery_target - now_et).total_seconds()
             if wait_sec > 0:
