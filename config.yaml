@@ -258,7 +258,6 @@ dry_run: false
 # First slot (09:15) = premarket: indices + stocks matching 1-day criteria (live premarket). No deep dives.
 delivery_times_et:
   - "09:15"
-  - "13:00"
   - "16:00"
 
 # Paths

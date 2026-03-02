@@ -4,8 +4,7 @@ on:
   workflow_dispatch:
   schedule:
     # Start job ~1h before delivery; script waits until delivery time then sends. No deep dives.
-    - cron: "30 12 * * *"  # Start 7:55 AM EDT → deliver at 9:15 AM ET
-    - cron: "0 16 * * *"   # Start 12:00 PM EDT → deliver at 1:00 PM ET
+    - cron: "30 12 * * *"  # Start 8:30 AM EDT → deliver at 9:15 AM ET
     - cron: "0 19 * * *"   # Start 3:00 PM EDT → deliver at 4:00 PM ET
 
 jobs:
