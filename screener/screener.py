@@ -156,6 +156,7 @@ def _evaluate_stock_data(
     thresholds_override: Optional[Dict] = None,
     max_dollar_volume: Optional[float] = None,
     override_sector: Optional[str] = None,
+    use_postmarket_prices: bool = False,
 ) -> Optional[Dict]:
     """
     Evaluate already-fetched stock data against thresholds. Used by screen_stock and by
@@ -226,7 +227,10 @@ def _evaluate_stock_data(
                 t = info.get("targetMeanPrice")
                 if t is not None and isinstance(t, (int, float)):
                     target_price = round(float(t), 2)
-                live_price = info.get("preMarketPrice") or info.get("regularMarketPrice") or info.get("currentPrice")
+                if use_postmarket_prices:
+                    live_price = info.get("postMarketPrice") or info.get("regularMarketPrice") or info.get("currentPrice")
+                else:
+                    live_price = info.get("preMarketPrice") or info.get("regularMarketPrice") or info.get("currentPrice")
             except Exception:
                 pass  # Use symbol as fallback
         else:
@@ -243,26 +247,35 @@ def _evaluate_stock_data(
                 t = info.get("targetMeanPrice")
                 if t is not None and isinstance(t, (int, float)):
                     target_price = round(float(t), 2)
-                live_price = info.get("preMarketPrice") or info.get("regularMarketPrice") or info.get("currentPrice")
+                if use_postmarket_prices:
+                    live_price = info.get("postMarketPrice") or info.get("regularMarketPrice") or info.get("currentPrice")
+                else:
+                    live_price = info.get("preMarketPrice") or info.get("regularMarketPrice") or info.get("currentPrice")
             except Exception:
                 pass
 
-        # Overlay live/pre-market price when available (so 9:30 AM report shows current quote, not just prior close)
+        # Overlay live post-market or pre-market price when available
         if live_price is not None and isinstance(live_price, (int, float)) and prev_close and prev_close > 0:
             try:
                 p = float(live_price)
                 if p > 0:
                     current_price = p
                     one_day_change = ((current_price - prev_close) / prev_close) * 100
-                    passes_day = _passes_pct(one_day_change, "one_day_pct_high", "one_day_pct_low", "one_day_pct_abs")
+                    if use_postmarket_prices:
+                        passes_day = abs(one_day_change) >= 3.0  # 8pm report: +/-3% during post-market
+                    else:
+                        passes_day = _passes_pct(one_day_change, "one_day_pct_high", "one_day_pct_low", "one_day_pct_abs")
             except (TypeError, ValueError):
                 pass
 
+        # regular_session_close = today's 4pm close (before any pre/post-market overlay)
+        regular_session_close = float(data["Close"].iloc[-1]) if len(data) > 0 else None
         out = {
             "symbol": symbol,
             "company_name": company_name,
             "sector": sector,
             "price": round(current_price, 2),
+            "regular_session_close": round(regular_session_close, 2) if regular_session_close is not None else None,
             "volume": int(current_volume),
             "one_day_pct": round(one_day_change, 2),
             "one_week_pct": round(one_week_change, 2),
@@ -290,6 +303,7 @@ def screen_stock(
     thresholds_override: Optional[Dict] = None,
     max_dollar_volume: Optional[float] = None,
     override_sector: Optional[str] = None,
+    use_postmarket_prices: bool = False,
 ) -> Optional[Dict]:
     """
     Screen a single stock against thresholds.
@@ -302,10 +316,11 @@ def screen_stock(
         thresholds_override=thresholds_override,
         max_dollar_volume=max_dollar_volume,
         override_sector=override_sector,
+        use_postmarket_prices=use_postmarket_prices,
     )
 
 
-def run_screener(config: Dict, symbols_override: Optional[List[str]] = None) -> List[Dict]:
+def run_screener(config: Dict, symbols_override: Optional[List[str]] = None, use_postmarket_prices: bool = False) -> List[Dict]:
     """Run the screener across all configured exchanges, or over a given symbol list if provided."""
     all_results = []
     seen_symbols = set()
@@ -324,7 +339,7 @@ def run_screener(config: Dict, symbols_override: Optional[List[str]] = None) -> 
     for symbol in symbols:
         if symbol in seen_symbols:
             continue
-        result = screen_stock(symbol, config)
+        result = screen_stock(symbol, config, use_postmarket_prices=use_postmarket_prices)
         if result:
             all_results.append(result)
             seen_symbols.add(symbol)
@@ -371,7 +386,7 @@ def run_rising_stars_screener(config: Dict, symbols_override: Optional[List[str]
 
 
 def run_screener_and_rising_stars(
-    config: Dict, symbols_override: Optional[List[str]] = None
+    config: Dict, symbols_override: Optional[List[str]] = None, use_postmarket_prices: bool = False
 ) -> tuple:
     """
     Single pass over all symbols: fetch each symbol once, then classify as big stock
@@ -409,6 +424,7 @@ def run_screener_and_rising_stars(
             thresholds_override=None,
             max_dollar_volume=None,
             override_sector=None,
+            use_postmarket_prices=use_postmarket_prices,
         )
         if r_big:
             big_results.append(r_big)
@@ -422,6 +438,7 @@ def run_screener_and_rising_stars(
                 thresholds_override=rising,
                 max_dollar_volume=max_dv_rising,
                 override_sector="Rising Stars",
+                use_postmarket_prices=use_postmarket_prices,
             )
             if r_rising:
                 rising_results.append(r_rising)

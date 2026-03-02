@@ -50,8 +50,8 @@ COMMODITY_CONTRACT_SIZE = {
 }
 
 
-def get_indices_snapshot() -> List[Dict]:
-    """Fetch current level and 1D/1W/1M/6M/1Y/3Y % changes for indices. Uses live/pre-market price when available."""
+def get_indices_snapshot(use_postmarket: bool = False) -> List[Dict]:
+    """Fetch current level and 1D/1W/1M/6M/1Y/3Y % changes for indices. Uses live post-market or pre-market price when available."""
     out = []
     for symbol, name in INDICES:
         try:
@@ -87,10 +87,13 @@ def get_indices_snapshot() -> List[Dict]:
                 n_3y = min(756, len(data) - 1)
                 p_3y = data["Close"].iloc[-(n_3y + 1)]
                 one_3y = ((data["Close"].iloc[-1] - p_3y) / p_3y) * 100
-            # Overlay live/pre-market price when available
+            # Overlay live post-market or pre-market price when available
             try:
                 info = ticker.info
-                live = info.get("preMarketPrice") or info.get("regularMarketPrice") or info.get("currentPrice")
+                if use_postmarket:
+                    live = info.get("postMarketPrice") or info.get("regularMarketPrice") or info.get("currentPrice")
+                else:
+                    live = info.get("preMarketPrice") or info.get("regularMarketPrice") or info.get("currentPrice")
                 if live is not None and isinstance(live, (int, float)) and prev_close and prev_close > 0:
                     p = float(live)
                     if p > 0:
@@ -711,8 +714,9 @@ def format_premarket_messages(
     collection_time: Optional[str] = None,
 ) -> List[str]:
     """
-    For the first delivery slot (9:15 AM): indices + only stocks that pass 1-day criteria.
-    Uses live premarket prices (already in all_results from screener). No crypto/forex/commodities/ETFs/deep dive/earnings.
+    For the first delivery slot (8 PM): indices + only stocks that pass 1-day criteria.
+    Uses live post-market/after-hours prices (already in all_results from screener). Same volume criteria (high vol + rising stars).
+    No crypto/forex/commodities/ETFs.
     """
     non_stock = {"Crypto", "Forex", "Commodities", "ETFs"}
     stocks_1d = [
@@ -724,7 +728,7 @@ def format_premarket_messages(
     messages = []
 
     if indices_data:
-        msg_indices = time_header + "📊 <b>MarketScout — Premarket (1/2) Indices</b>\n\n<b>🌍 Indices</b>\n"
+        msg_indices = time_header + "📊 <b>MarketScout — Post-market (1/2) Indices</b>\n\n<b>🌍 Indices</b>\n"
         for idx in indices_data:
             name = idx["name"]
             symbol = idx["symbol"]
@@ -750,12 +754,116 @@ def format_premarket_messages(
                 msg_indices += f"  {d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str} | {three_yr_str}\n\n"
         messages.append((msg_indices.strip() + SECTION_END).strip())
 
-    msg_stocks = time_header + "📊 <b>MarketScout — Premarket (2/2) Stocks (1D criteria, live premarket)</b>\n\n"
-    msg_stocks += f"Stocks matching 1-day move (live premarket prices): {len(stocks_1d)}\n\n"
+    msg_stocks = time_header + "📊 <b>MarketScout — Post-market (2/2) Stocks (1D criteria, live after-hours)</b>\n\n"
+    msg_stocks += f"Stocks matching 1-day move (live post-market prices, same volume criteria): {len(stocks_1d)}\n\n"
     msg_stocks += _format_one_stock_block(stocks_1d) + SECTION_END
     messages.append(msg_stocks.strip())
 
     return [m for m in messages if m]
+
+
+def _log_price_tracking_archive(
+    results_to_log: list,
+    report_type: str,
+    config: dict,
+) -> Tuple[Optional[List[Dict]], Optional[Dict]]:
+    """
+    Append each stock appearance to archive. Returns (stocks_with_pct_next, yesterday_8pm_by_symbol)
+    for building the 4pm tracking Telegram message.
+    """
+    import csv
+    from datetime import timedelta
+    non_stock = {"Crypto", "Forex", "Commodities", "ETFs"}
+    stocks_only = [r for r in results_to_log if r.get("sector") not in non_stock]
+    if not stocks_only:
+        return None, None
+    try:
+        paths = config.get("paths") or {}
+        logs_dir = paths.get("logs_dir", "logs")
+        Path(logs_dir).mkdir(parents=True, exist_ok=True)
+        now = datetime.now(ZoneInfo("America/New_York"))
+        date_str = now.strftime("%Y-%m-%d")
+        time_str = now.strftime("%H:%M")
+        ts = now.strftime("%Y-%m-%d %H:%M %Z")
+        yesterday_str = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+        filename = os.path.join(logs_dir, "price_tracking_archive.csv")
+        file_exists = os.path.exists(filename)
+        yesterday_8pm = {}
+        if file_exists:
+            with open(filename, "r", encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get("date") == yesterday_str and row.get("report") == "8pm":
+                        s = row.get("symbol", "")
+                        p8 = row.get("price_8pm", "")
+                        if s and p8:
+                            yesterday_8pm[s] = p8
+        fields = ["timestamp", "date", "time", "symbol", "name", "report", "price_4pm", "price_8pm", "pct_change_4pm_to_8pm", "pct_change_8pm_to_next_4pm"]
+        to_append = []
+        stocks_with_pct = []
+        for r in stocks_only:
+            symbol = r.get("symbol", "")
+            name = (r.get("company_name") or symbol).replace(",", ";")
+            if report_type == "4pm":
+                price_4pm = r.get("regular_session_close") or r.get("price")
+                p8_prev = yesterday_8pm.get(symbol, "")
+                pct_next = ""
+                if price_4pm and p8_prev:
+                    try:
+                        p4, p8 = float(price_4pm), float(p8_prev)
+                        if p8 > 0:
+                            pct_next = f"{((p4 - p8) / p8) * 100:.2f}"
+                            stocks_with_pct.append({
+                                "symbol": symbol, "name": name,
+                                "price_8pm": p8_prev, "price_4pm": price_4pm,
+                                "pct_change_8pm_to_next_4pm": pct_next,
+                            })
+                    except (ValueError, TypeError):
+                        pass
+                to_append.append({"timestamp": ts, "date": date_str, "time": time_str, "symbol": symbol, "name": name, "report": "4pm",
+                    "price_4pm": price_4pm or "", "price_8pm": "", "pct_change_4pm_to_8pm": "", "pct_change_8pm_to_next_4pm": pct_next})
+            else:
+                price_4pm = r.get("regular_session_close")
+                price_8pm = r.get("price")
+                pct = ""
+                if price_4pm and price_8pm and float(price_4pm) > 0:
+                    pct = f"{((float(price_8pm) - float(price_4pm)) / float(price_4pm)) * 100:.2f}"
+                to_append.append({"timestamp": ts, "date": date_str, "time": time_str, "symbol": symbol, "name": name, "report": "8pm",
+                    "price_4pm": price_4pm or "", "price_8pm": price_8pm or "", "pct_change_4pm_to_8pm": pct, "pct_change_8pm_to_next_4pm": ""})
+        with open(filename, "a" if file_exists else "w", encoding="utf-8", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fields)
+            if not file_exists:
+                writer.writeheader()
+            for row in to_append:
+                writer.writerow(row)
+        print(f"  Archived {len(stocks_only)} stock appearances to {filename}", flush=True)
+        return (stocks_with_pct, yesterday_8pm) if report_type == "4pm" else (None, None)
+    except Exception as e:
+        print(f"  [LOG] Could not write price archive: {e}", flush=True)
+        return None, None
+
+
+def _format_tracking_summary_4pm(
+    stocks_with_pct: list,
+    collection_time: Optional[str] = None,
+) -> str:
+    """Format 4pm tracking message: today 4pm vs yesterday 8pm."""
+    if not stocks_with_pct:
+        return ""
+    SECTION_END = "\n\n🔵🔵🔵🔵🔵🔵🔵🔵🔵🔵"
+    time_header = ("🕐 " + (collection_time or "") + "\n\n" if collection_time else "")
+    msg = time_header + "📈 <b>MarketScout — Price Tracking (4pm vs yesterday 8pm)</b>\n\n"
+    msg += "Stocks in today's 4pm report that also appeared in yesterday's 8pm report:\n\n"
+    for s in sorted(stocks_with_pct, key=lambda x: -abs(float(x.get("pct_change_8pm_to_next_4pm", 0) or 0))):
+        sym = s.get("symbol", "")
+        name = (s.get("name") or sym).replace(",", ";")
+        p8 = s.get("price_8pm", "")
+        p4 = s.get("price_4pm", "")
+        pct = s.get("pct_change_8pm_to_next_4pm", "")
+        emoji = "🟢" if pct and float(pct) >= 0 else "🔴"
+        msg += f"{emoji} <b>{html.escape(name)} ({sym})</b>\n"
+        msg += f"  Yesterday 8pm: ${p8} → Today 4pm: ${p4} ({pct}%)\n\n"
+    return (msg.strip() + SECTION_END).strip()
 
 
 def _criteria_count(r: dict) -> int:
@@ -1029,7 +1137,7 @@ def main() -> None:
     # Load configuration
     config = load_config("config.yaml")
     
-    # Determine which delivery slot we're in (0 = first = premarket: only indices + 1D stocks at 9:15)
+    # Determine which delivery slot we're in (0 = first = post-market: only indices + 1D stocks at 8pm)
     next_delivery_target, delivery_slot_index = _get_next_delivery_target(config)
     
     # Manual trigger: send Report 1 (premarket) right now with current data (premarket/live prices)
@@ -1037,7 +1145,7 @@ def main() -> None:
     if force_report_1:
         delivery_slot_index = 0
         next_delivery_target = None  # send immediately, no wait
-        print("MARKETSCOUT_REPORT_1=1: building Report 1 (premarket) and sending immediately.", flush=True)
+        print("MARKETSCOUT_REPORT_1=1: building Report 1 (post-market) and sending immediately.", flush=True)
     
     # Check if dry-run mode
     dry_run = config.get("dry_run", False)
@@ -1059,7 +1167,8 @@ def main() -> None:
     # Capture time when we start pulling from Yahoo (not when we send)
     collection_time = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M %Z")
     print("Fetching indices...")
-    indices_data = get_indices_snapshot()
+    use_postmarket = delivery_slot_index == 0
+    indices_data = get_indices_snapshot(use_postmarket=use_postmarket)
 
     # Run crypto, forex, commodities, ETFs first (small symbol lists). Then run the long stock scan.
     # This way message 4 is always populated even if the job times out or gets rate-limited during stocks.
@@ -1075,9 +1184,11 @@ def main() -> None:
     print("Starting MarketScout stock screener (big + rising stars)...")
     if config.get("rising_stars_thresholds"):
         # Single pass: get both big stocks and rising stars (avoids timeout/rate limits on scheduled runs)
-        results, rising_stars_results = run_screener_and_rising_stars(config, symbols_override=sample_symbols)
+        results, rising_stars_results = run_screener_and_rising_stars(
+            config, symbols_override=sample_symbols, use_postmarket_prices=use_postmarket
+        )
     else:
-        results = run_screener(config, symbols_override=sample_symbols)
+        results = run_screener(config, symbols_override=sample_symbols, use_postmarket_prices=use_postmarket)
         rising_stars_results = []
 
     all_results = results + rising_stars_results + crypto_results + forex_results + commodity_results + etf_results
@@ -1086,7 +1197,7 @@ def main() -> None:
     commodity_count = len(commodity_results)
     etf_count = len(etf_results)
     
-    # Premarket run (first delivery slot): only indices + stocks that pass 1-day criteria (live premarket prices)
+    # Post-market run (first delivery slot): only indices + stocks that pass 1-day criteria (live after-hours prices)
     if delivery_slot_index == 0:
         messages = format_premarket_messages(indices_data, all_results, collection_time=collection_time)
     else:
@@ -1142,7 +1253,21 @@ def main() -> None:
         for msg in messages:
             send_telegram_message(msg, token, chat_id)
         print(f"\nTelegram notification sent ({len(messages)} messages): {len(results)} stock(s), {len(rising_stars_results)} rising star(s), {etf_count} ETF(s), {crypto_count} crypto, {forex_count} forex, {commodity_count} commodities")
-        
+
+        # Archive every stock appearance (append-only) and send 4pm tracking summary
+        non_stock = {"Crypto", "Forex", "Commodities", "ETFs"}
+        if delivery_slot_index == 0:
+            stocks_1d = [r for r in all_results if r.get("sector") not in non_stock and r.get("passes_day")]
+            _log_price_tracking_archive(stocks_1d, "8pm", config)
+        else:
+            stocks_full = [r for r in all_results if r.get("sector") not in non_stock]
+            stocks_with_pct, _ = _log_price_tracking_archive(stocks_full, "4pm", config)
+            if stocks_with_pct:
+                tracking_msg = _format_tracking_summary_4pm(stocks_with_pct, collection_time=collection_time)
+                if tracking_msg:
+                    send_telegram_message(tracking_msg, token, chat_id)
+                    print("  Price tracking summary (4pm vs yesterday 8pm) sent to Telegram", flush=True)
+
         # Charts only for full report (not premarket)
         if delivery_slot_index != 0:
             results_for_charts = [r for r in all_results if _criteria_count(r) >= 2]

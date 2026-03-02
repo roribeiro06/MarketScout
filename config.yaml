@@ -255,9 +255,9 @@ run_profile: morning_scan
 dry_run: false
 
 # Optional: deliver at these Eastern times (HH:MM). Job should start ~1h before so report is ready in time.
-# First slot (09:15) = premarket: indices + stocks matching 1-day criteria (live premarket). No deep dives.
+# First slot (20:00) = post-market: indices + stocks matching 1-day criteria (live after-hours). No deep dives.
 delivery_times_et:
-  - "09:15"
+  - "20:00"
   - "16:00"
 
 # Paths
