@@ -866,6 +866,16 @@ def _format_tracking_summary_4pm(
     return (msg.strip() + SECTION_END).strip()
 
 
+def _format_tracking_no_data_4pm(collection_time: Optional[str] = None) -> str:
+    """Format 4pm tracking message when there is no yesterday 8pm data to compare."""
+    SECTION_END = "\n\n🔵🔵🔵🔵🔵🔵🔵🔵🔵🔵"
+    time_header = ("🕐 " + (collection_time or "") + "\n\n" if collection_time else "")
+    msg = time_header + "📈 <b>MarketScout — Price Tracking (4pm vs yesterday 8pm)</b>\n\n"
+    msg += "No yesterday 8pm data in the archive (e.g. the 8pm report did not run). "
+    msg += "The comparison will appear after the next 8pm report runs."
+    return (msg.strip() + SECTION_END).strip()
+
+
 def _criteria_count(r: dict) -> int:
     """Count how many of 1D, 1W, 1M criteria the asset passes."""
     return sum(1 for k in ("passes_day", "passes_week", "passes_month") if r.get(k))
@@ -1262,11 +1272,10 @@ def main() -> None:
         else:
             stocks_full = [r for r in all_results if r.get("sector") not in non_stock]
             stocks_with_pct, _ = _log_price_tracking_archive(stocks_full, "4pm", config)
-            if stocks_with_pct:
-                tracking_msg = _format_tracking_summary_4pm(stocks_with_pct, collection_time=collection_time)
-                if tracking_msg:
-                    send_telegram_message(tracking_msg, token, chat_id)
-                    print("  Price tracking summary (4pm vs yesterday 8pm) sent to Telegram", flush=True)
+            tracking_msg = _format_tracking_summary_4pm(stocks_with_pct, collection_time=collection_time) if stocks_with_pct else _format_tracking_no_data_4pm(collection_time=collection_time)
+            if tracking_msg:
+                send_telegram_message(tracking_msg, token, chat_id)
+                print("  Price tracking summary (4pm vs yesterday 8pm) sent to Telegram", flush=True)
 
         # Charts only for full report (not premarket)
         if delivery_slot_index != 0:
