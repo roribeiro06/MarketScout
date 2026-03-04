@@ -254,11 +254,13 @@ run_profile: morning_scan
 # Dry-run mode: when true, do not hit Telegram API, just log
 dry_run: false
 
-# Optional: deliver at these Eastern times (HH:MM). Job should start ~1h before so report is ready in time.
-# First slot (20:00) = post-market: indices + stocks matching 1-day criteria (live after-hours). No deep dives.
+# Optional: deliver at these Eastern times (HH:MM). Job starts ~1h before; script waits until time then sends.
+# 08:00 = pre-market 4am→8am ±3% | 16:00 = regular 9:30am→4pm ±3% | 17:00 = 4pm→5pm ±2% | 20:00 = 4pm→8pm ±3%
 delivery_times_et:
-  - "20:00"
+  - "08:00"
   - "16:00"
+  - "17:00"
+  - "20:00"
 
 # Paths
 paths:

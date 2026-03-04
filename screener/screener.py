@@ -157,10 +157,10 @@ def _evaluate_stock_data(
     max_dollar_volume: Optional[float] = None,
     override_sector: Optional[str] = None,
     use_postmarket_prices: bool = False,
+    report_slot: Optional[str] = None,
 ) -> Optional[Dict]:
     """
-    Evaluate already-fetched stock data against thresholds. Used by screen_stock and by
-    run_screener_and_rising_stars to avoid fetching the same symbol twice.
+    Evaluate already-fetched stock data. report_slot: "8am"|"4pm"|"5pm"|"8pm" for scheduled reports.
     """
     if data is None or len(data) < 5:
         return None
@@ -205,8 +205,9 @@ def _evaluate_stock_data(
         passes_volume = dollar_volume > min_dv
     passes_price = current_price >= thresholds.get("min_price", 0)  # Default to 0 if not specified
     
-    # Stock passes if: volume AND price AND (1D or 1W or 1M, or for 8pm we'll check 4pm→8pm after overlay)
-    if passes_volume and passes_price and (passes_day or passes_week or passes_month or use_postmarket_prices):
+    # Stock passes if: volume AND price AND (1D or 1W or 1M, or post-market/4pm/5pm/8pm/8am slot)
+    slot_ok = report_slot in ("8am", "4pm", "5pm", "8pm")
+    if passes_volume and passes_price and (passes_day or passes_week or passes_month or use_postmarket_prices or slot_ok):
         
         # Fetch company name and sector (use override_sector for rising stars; display_sector = real sector for display)
         company_name = symbol
@@ -229,6 +230,8 @@ def _evaluate_stock_data(
                     target_price = round(float(t), 2)
                 if use_postmarket_prices:
                     live_price = info.get("postMarketPrice") or info.get("regularMarketPrice") or info.get("currentPrice")
+                elif report_slot == "8am":
+                    live_price = info.get("preMarketPrice") or info.get("regularMarketPrice") or info.get("currentPrice")
                 else:
                     live_price = info.get("preMarketPrice") or info.get("regularMarketPrice") or info.get("currentPrice")
             except Exception:
@@ -249,6 +252,8 @@ def _evaluate_stock_data(
                     target_price = round(float(t), 2)
                 if use_postmarket_prices:
                     live_price = info.get("postMarketPrice") or info.get("regularMarketPrice") or info.get("currentPrice")
+                elif report_slot == "8am":
+                    live_price = info.get("preMarketPrice") or info.get("regularMarketPrice") or info.get("currentPrice")
                 else:
                     live_price = info.get("preMarketPrice") or info.get("regularMarketPrice") or info.get("currentPrice")
             except Exception:
@@ -257,6 +262,11 @@ def _evaluate_stock_data(
         # regular_session_close = today's 4pm close (before any pre/post-market overlay)
         regular_session_close = float(data["Close"].iloc[-1]) if len(data) > 0 else None
         regular_session_open = float(data["Open"].iloc[-1]) if len(data) > 0 and "Open" in data.columns else None
+
+        # 4pm report: open (9:30) → close (4pm) ±3%
+        if report_slot == "4pm" and regular_session_open and regular_session_open > 0 and regular_session_close is not None:
+            one_day_change = ((regular_session_close - regular_session_open) / regular_session_open) * 100
+            passes_day = abs(one_day_change) >= 3.0
 
         pct_4pm_to_8pm = None
         # Overlay live post-market or pre-market price when available
@@ -270,7 +280,13 @@ def _evaluate_stock_data(
                         if regular_session_open and regular_session_open > 0:
                             one_day_change = ((regular_session_close - regular_session_open) / regular_session_open) * 100
                         pct_4pm_to_8pm = ((current_price - regular_session_close) / regular_session_close) * 100
-                        passes_day = abs(pct_4pm_to_8pm) >= 3.0
+                        # 5pm: ±2%, 8pm: ±3%
+                        threshold = 2.0 if report_slot == "5pm" else 3.0
+                        passes_day = abs(pct_4pm_to_8pm) >= threshold
+                    elif report_slot == "8am" and prev_close and prev_close > 0:
+                        # 8am: pre-market 4am→8am ±3% (prev_close as proxy for 4am)
+                        one_day_change = ((current_price - prev_close) / prev_close) * 100
+                        passes_day = abs(one_day_change) >= 3.0
                     elif prev_close and prev_close > 0:
                         one_day_change = ((current_price - prev_close) / prev_close) * 100
                         passes_day = _passes_pct(one_day_change, "one_day_pct_high", "one_day_pct_low", "one_day_pct_abs")
@@ -300,9 +316,13 @@ def _evaluate_stock_data(
             out["target_price"] = target_price
         if pct_4pm_to_8pm is not None:
             out["pct_4pm_to_8pm"] = round(pct_4pm_to_8pm, 2)
-        # 8pm report: only include stocks with ±3% move from 4pm to 8pm
-        if use_postmarket_prices and not passes_day:
-            return None
+        # Slot reports: 8am/5pm/8pm = only slot move; 4pm = open→close ±3% OR 1W ±5% OR 1M ±10%
+        if use_postmarket_prices or report_slot in ("5pm", "8pm", "8am"):
+            if not passes_day:
+                return None
+        if report_slot == "4pm":
+            if not (passes_day or passes_week or passes_month):
+                return None
         return out
 
     return None
@@ -315,11 +335,13 @@ def screen_stock(
     max_dollar_volume: Optional[float] = None,
     override_sector: Optional[str] = None,
     use_postmarket_prices: bool = False,
+    report_slot: Optional[str] = None,
 ) -> Optional[Dict]:
     """
     Screen a single stock against thresholds.
     Returns dict with stock info if it passes screening, None otherwise.
     Optional: thresholds_override (e.g. rising_stars_thresholds), max_dollar_volume for band filter, override_sector (e.g. "Rising Stars").
+    report_slot: "8am"|"4pm"|"5pm"|"8pm" for scheduled reports.
     """
     data = fetch_stock_data(symbol, period="5y")
     return _evaluate_stock_data(
@@ -328,10 +350,11 @@ def screen_stock(
         max_dollar_volume=max_dollar_volume,
         override_sector=override_sector,
         use_postmarket_prices=use_postmarket_prices,
+        report_slot=report_slot,
     )
 
 
-def run_screener(config: Dict, symbols_override: Optional[List[str]] = None, use_postmarket_prices: bool = False) -> List[Dict]:
+def run_screener(config: Dict, symbols_override: Optional[List[str]] = None, use_postmarket_prices: bool = False, report_slot: Optional[str] = None) -> List[Dict]:
     """Run the screener across all configured exchanges, or over a given symbol list if provided."""
     all_results = []
     seen_symbols = set()
@@ -350,7 +373,7 @@ def run_screener(config: Dict, symbols_override: Optional[List[str]] = None, use
     for symbol in symbols:
         if symbol in seen_symbols:
             continue
-        result = screen_stock(symbol, config, use_postmarket_prices=use_postmarket_prices)
+        result = screen_stock(symbol, config, use_postmarket_prices=use_postmarket_prices, report_slot=report_slot)
         if result:
             all_results.append(result)
             seen_symbols.add(symbol)
@@ -397,7 +420,7 @@ def run_rising_stars_screener(config: Dict, symbols_override: Optional[List[str]
 
 
 def run_screener_and_rising_stars(
-    config: Dict, symbols_override: Optional[List[str]] = None, use_postmarket_prices: bool = False
+    config: Dict, symbols_override: Optional[List[str]] = None, use_postmarket_prices: bool = False, report_slot: Optional[str] = None
 ) -> tuple:
     """
     Single pass over all symbols: fetch each symbol once, then classify as big stock
@@ -436,6 +459,7 @@ def run_screener_and_rising_stars(
             max_dollar_volume=None,
             override_sector=None,
             use_postmarket_prices=use_postmarket_prices,
+            report_slot=report_slot,
         )
         if r_big:
             big_results.append(r_big)
@@ -450,6 +474,7 @@ def run_screener_and_rising_stars(
                 max_dollar_volume=max_dv_rising,
                 override_sector="Rising Stars",
                 use_postmarket_prices=use_postmarket_prices,
+                report_slot=report_slot,
             )
             if r_rising:
                 rising_results.append(r_rising)

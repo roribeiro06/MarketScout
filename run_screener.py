@@ -1155,15 +1155,18 @@ def main() -> None:
     # Load configuration
     config = load_config("config.yaml")
     
-    # Determine which delivery slot we're in (0 = first = post-market: only indices + 1D stocks at 8pm)
+    # Determine which delivery slot we're in (0=8am, 1=4pm, 2=5pm, 3=8pm)
     next_delivery_target, delivery_slot_index = _get_next_delivery_target(config)
-    
-    # Manual trigger: send Report 1 (premarket) right now with current data (premarket/live prices)
+    REPORT_SLOTS = ["8am", "4pm", "5pm", "8pm"]
+    report_slot = REPORT_SLOTS[delivery_slot_index] if delivery_slot_index is not None else None
+
+    # Manual trigger: send slot 0 report (8am pre-market) right now
     force_report_1 = (os.getenv("MARKETSCOUT_REPORT_1") or "").strip().lower() in ("1", "true", "yes")
     if force_report_1:
         delivery_slot_index = 0
+        report_slot = "8am"
         next_delivery_target = None  # send immediately, no wait
-        print("MARKETSCOUT_REPORT_1=1: building Report 1 (post-market) and sending immediately.", flush=True)
+        print("MARKETSCOUT_REPORT_1=1: building 8am report and sending immediately.", flush=True)
     
     # Check if dry-run mode
     dry_run = config.get("dry_run", False)
@@ -1185,8 +1188,9 @@ def main() -> None:
     # Capture time when we start pulling from Yahoo (not when we send)
     collection_time = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M %Z")
     print("Fetching indices...")
-    use_postmarket = delivery_slot_index == 0
-    indices_data = get_indices_snapshot(use_postmarket=use_postmarket)
+    # Indices: pre-market for 8am, regular for 4pm, post-market for 5pm/8pm
+    use_postmarket_indices = report_slot in ("5pm", "8pm")
+    indices_data = get_indices_snapshot(use_postmarket=use_postmarket_indices)
 
     # Run crypto, forex, commodities, ETFs first (small symbol lists). Then run the long stock scan.
     # This way message 4 is always populated even if the job times out or gets rate-limited during stocks.
@@ -1200,13 +1204,14 @@ def main() -> None:
     etf_results = run_etf_screener(config)
 
     print("Starting MarketScout stock screener (big + rising stars)...")
+    use_postmarket_stocks = report_slot in ("5pm", "8pm")
     if config.get("rising_stars_thresholds"):
         # Single pass: get both big stocks and rising stars (avoids timeout/rate limits on scheduled runs)
         results, rising_stars_results = run_screener_and_rising_stars(
-            config, symbols_override=sample_symbols, use_postmarket_prices=use_postmarket
+            config, symbols_override=sample_symbols, use_postmarket_prices=use_postmarket_stocks, report_slot=report_slot
         )
     else:
-        results = run_screener(config, symbols_override=sample_symbols, use_postmarket_prices=use_postmarket)
+        results = run_screener(config, symbols_override=sample_symbols, use_postmarket_prices=use_postmarket_stocks, report_slot=report_slot)
         rising_stars_results = []
 
     all_results = results + rising_stars_results + crypto_results + forex_results + commodity_results + etf_results
@@ -1214,25 +1219,22 @@ def main() -> None:
     forex_count = len(forex_results)
     commodity_count = len(commodity_results)
     etf_count = len(etf_results)
-    
-    # Post-market run (first delivery slot): only indices + stocks that pass 1-day criteria (live after-hours prices)
-    if delivery_slot_index == 0:
-        messages = format_premarket_messages(indices_data, all_results, collection_time=collection_time)
-    else:
-        # Full report: 4 messages + optional deep dive + earnings
-        msg_indices, msg_big, msg_rising, msg_rest = format_stock_message(
-            all_results,
-            crypto_count=crypto_count,
-            forex_count=forex_count,
-            commodity_count=commodity_count,
-            etf_count=etf_count,
-            indices_data=indices_data,
-            etf_asset_class_order=config.get("etf_asset_class_order"),
-            collection_time=collection_time,
-        )
-        messages = [msg_indices, msg_big, msg_rising, msg_rest]
 
-        # Earnings dates
+    # All slots: full report (indices, stocks, ETFs, crypto, commodities, forex)
+    msg_indices, msg_big, msg_rising, msg_rest = format_stock_message(
+        all_results,
+        crypto_count=crypto_count,
+        forex_count=forex_count,
+        commodity_count=commodity_count,
+        etf_count=etf_count,
+        indices_data=indices_data,
+        etf_asset_class_order=config.get("etf_asset_class_order"),
+        collection_time=collection_time,
+    )
+    messages = [msg_indices, msg_big, msg_rising, msg_rest]
+
+    # Earnings dates (4pm slot only)
+    if report_slot == "4pm":
         msg_earnings = format_earnings_message(all_results, collection_time=collection_time)
         if msg_earnings:
             messages.append(msg_earnings)
@@ -1274,10 +1276,10 @@ def main() -> None:
 
         # Archive every stock appearance (append-only) and send 4pm tracking summary
         non_stock = {"Crypto", "Forex", "Commodities", "ETFs"}
-        if delivery_slot_index == 0:
-            stocks_1d = [r for r in all_results if r.get("sector") not in non_stock and r.get("passes_day")]
-            _log_price_tracking_archive(stocks_1d, "8pm", config)
-        else:
+        if report_slot == "8pm":
+            stocks_8pm = [r for r in all_results if r.get("sector") not in non_stock and r.get("passes_day")]
+            _log_price_tracking_archive(stocks_8pm, "8pm", config)
+        elif report_slot == "4pm":
             stocks_full = [r for r in all_results if r.get("sector") not in non_stock]
             stocks_with_pct, _ = _log_price_tracking_archive(stocks_full, "4pm", config)
             tracking_msg = _format_tracking_summary_4pm(stocks_with_pct, collection_time=collection_time) if stocks_with_pct else _format_tracking_no_data_4pm(collection_time=collection_time)
@@ -1285,8 +1287,8 @@ def main() -> None:
                 send_telegram_message(tracking_msg, token, chat_id)
                 print("  Price tracking summary (4pm vs yesterday 8pm) sent to Telegram", flush=True)
 
-        # Charts only for full report (not premarket)
-        if delivery_slot_index != 0:
+        # Charts only for 4pm report
+        if report_slot == "4pm":
             results_for_charts = [r for r in all_results if _criteria_count(r) >= 2]
             print(f"  Assets with 2+ criteria (for charts): {len(results_for_charts)}")
             if results_for_charts:
