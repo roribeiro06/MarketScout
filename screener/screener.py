@@ -316,12 +316,14 @@ def _evaluate_stock_data(
             out["target_price"] = target_price
         if pct_4pm_to_8pm is not None:
             out["pct_4pm_to_8pm"] = round(pct_4pm_to_8pm, 2)
-        # Slot reports: 8am/5pm/8pm = only slot move; 4pm = open→close ±3% OR 1W ±5% OR 1M ±10%
+        # Slot reports: 8am/5pm/8pm = only slot move; 4pm = 2 of 3 (1D ±3%, 1W ±5%, 1M ±10%)
         if use_postmarket_prices or report_slot in ("5pm", "8pm", "8am"):
             if not passes_day:
                 return None
         if report_slot == "4pm":
-            if not (passes_day or passes_week or passes_month):
+            # Require at least 2 of 3 criteria
+            criteria_count = sum([passes_day, passes_week, passes_month])
+            if criteria_count < 2:
                 return None
         return out
 

@@ -1,10 +1,11 @@
 """Main entry point for MarketScout stock screener."""
+import csv
 import html
 import os
 import re
 import time
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 from pathlib import Path
@@ -884,6 +885,156 @@ def _format_tracking_no_data_4pm(collection_time: Optional[str] = None) -> str:
     return (msg.strip() + SECTION_END).strip()
 
 
+def _append_appearance_log(
+    results_to_log: list,
+    report_slot: str,
+    config: dict,
+) -> None:
+    """Append each appearance to logs/appearance_archive.csv (date, symbol, name, report, price, pct) for 12pm report."""
+    if report_slot not in ("8am", "4pm", "5pm", "8pm") or not results_to_log:
+        return
+    non_stock = {"Crypto", "Forex", "Commodities", "ETFs"}
+    rows = []
+    for r in results_to_log:
+        if r.get("sector") in non_stock and report_slot != "4pm":
+            continue
+        symbol = r.get("symbol", "")
+        name = (r.get("company_name") or symbol).replace(",", ";")
+        price = r.get("price") or r.get("regular_session_close")
+        if report_slot == "4pm":
+            pct = r.get("one_day_pct")
+        elif report_slot in ("5pm", "8pm"):
+            pct = r.get("pct_4pm_to_8pm")
+        else:
+            pct = r.get("one_day_pct")
+        if symbol and price is not None:
+            pct_val = pct if pct is not None else ""
+            rows.append({"date": "", "symbol": symbol, "name": name, "report": report_slot, "price": price, "pct": pct_val})
+    if not rows:
+        return
+    try:
+        paths = config.get("paths") or {}
+        logs_dir = paths.get("logs_dir", "logs")
+        Path(logs_dir).mkdir(parents=True, exist_ok=True)
+        now = datetime.now(ZoneInfo("America/New_York"))
+        date_str = now.strftime("%Y-%m-%d")
+        filename = os.path.join(logs_dir, "appearance_archive.csv")
+        file_exists = os.path.exists(filename)
+        fields = ["date", "symbol", "name", "report", "price", "pct"]
+        with open(filename, "a" if file_exists else "w", encoding="utf-8", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fields)
+            if not file_exists:
+                writer.writeheader()
+            for row in rows:
+                row["date"] = date_str
+                writer.writerow(row)
+        print(f"  Appearance log: {len(rows)} rows for {report_slot} -> {filename}", flush=True)
+    except Exception as e:
+        print(f"  [LOG] Could not write appearance archive: {e}", flush=True)
+
+
+def _run_12pm_tracking_report(config: dict) -> None:
+    """Build and send 12pm tracking report: Part 1 = 4pm log (6 months), Part 2 = 8am/5pm/8pm log (3 days)."""
+    load_dotenv()
+    paths = config.get("paths") or {}
+    logs_dir = paths.get("logs_dir", "logs")
+    filename = os.path.join(logs_dir, "appearance_archive.csv")
+    if not os.path.exists(filename):
+        print("No appearance_archive.csv; skipping 12pm report.", flush=True)
+        return
+    now_et = datetime.now(ZoneInfo("America/New_York"))
+    today_str = now_et.strftime("%Y-%m-%d")
+    six_months_ago = (now_et - timedelta(days=180)).strftime("%Y-%m-%d")
+    three_days_ago = (now_et - timedelta(days=3)).strftime("%Y-%m-%d")
+
+    # Read archive
+    rows_4pm = []  # (date, symbol, name, pct)
+    rows_short = []  # (date, symbol, name, report, pct)
+    with open(filename, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            d = row.get("date", "")
+            s = row.get("symbol", "")
+            rpt = row.get("report", "")
+            if rpt == "4pm" and d >= six_months_ago:
+                rows_4pm.append((d, s, row.get("name", s), row.get("pct", "")))
+            elif rpt in ("8am", "5pm", "8pm") and d >= three_days_ago:
+                rows_short.append((d, s, row.get("name", s), rpt, row.get("pct", "")))
+
+    # Part 1: 4pm symbols from last 6 months (unique symbols, show each with history of dates + pct)
+    from collections import defaultdict
+    by_sym_4pm = defaultdict(list)
+    for d, sym, name, pct in rows_4pm:
+        by_sym_4pm[sym].append((d, pct))
+    # Sort by symbol, each list of (date, pct) sorted by date
+    symbols_4pm = sorted(by_sym_4pm.keys())
+    for sym in symbols_4pm:
+        by_sym_4pm[sym].sort(key=lambda x: x[0])
+
+    # Part 2: 8am/5pm/8pm symbols that have first appearance in last 3 days
+    first_seen = {}
+    for d, sym, _n, rpt, _p in rows_short:
+        key = (sym, rpt)
+        if key not in first_seen or d < first_seen[key]:
+            first_seen[key] = d
+    # Include symbol if any of its (sym, 8am), (sym, 5pm), (sym, 8pm) has first_seen >= three_days_ago
+    short_term_symbols = set()
+    for (sym, rpt), first_d in first_seen.items():
+        if first_d >= three_days_ago:
+            short_term_symbols.add(sym)
+    by_sym_short = defaultdict(list)
+    for d, sym, name, rpt, pct in rows_short:
+        if sym in short_term_symbols:
+            by_sym_short[sym].append((d, rpt, pct))
+    for sym in by_sym_short:
+        by_sym_short[sym].sort(key=lambda x: x[0])
+
+    # Fetch current prices for all symbols
+    all_syms = list(set(symbols_4pm) | short_term_symbols)
+    prices = {}
+    for sym in all_syms:
+        try:
+            t = yf.Ticker(sym)
+            info = t.info or {}
+            p = info.get("regularMarketPrice") or info.get("currentPrice") or info.get("previousClose")
+            if p is not None:
+                prices[sym] = float(p)
+        except Exception:
+            pass
+
+    SECTION_END = "\n\n🔵🔵🔵🔵🔵🔵🔵🔵🔵🔵"
+    collection_time = now_et.strftime("%Y-%m-%d %H:%M %Z")
+    time_header = "🕐 " + collection_time + "\n\n"
+    msg_part1 = time_header + "📋 <b>MarketScout — 12pm Tracking (Part 1: 4pm log, 6 months)</b>\n\n"
+    msg_part1 += "Assets that appeared in 4pm reports (today's price + logged 4pm % moves):\n\n"
+    for sym in symbols_4pm:
+        name = next((r[2] for r in rows_4pm if r[1] == sym), sym)
+        cur = prices.get(sym)
+        cur_str = f"${cur:.2f}" if cur is not None else "—"
+        log_str = "; ".join(f"{d} ({pct}%)" for d, pct in by_sym_4pm[sym])
+        msg_part1 += f"<b>{html.escape(name)} ({sym})</b> now {cur_str}\n  Log: {log_str}\n\n"
+    msg_part1 = (msg_part1.strip() + SECTION_END).strip()
+
+    msg_part2 = time_header + "📋 <b>MarketScout — 12pm Tracking (Part 2: 8am/5pm/8pm, 3 days)</b>\n\n"
+    msg_part2 += "Assets that appeared in 8am/5pm/8pm in last 3 days (today's price + logged moves):\n\n"
+    for sym in sorted(by_sym_short.keys()):
+        name = next((r[2] for r in rows_short if r[1] == sym), sym)
+        cur = prices.get(sym)
+        cur_str = f"${cur:.2f}" if cur is not None else "—"
+        log_str = "; ".join(f"{d} {rpt} ({pct}%)" for d, rpt, pct in entries)
+        msg_part2 += f"<b>{html.escape(name)} ({sym})</b> now {cur_str}\n  Log: {log_str}\n\n"
+    msg_part2 = (msg_part2.strip() + SECTION_END).strip()
+
+    token = (os.getenv("TELEGRAM_BOT_TOKEN") or "").strip()
+    chat_id = (os.getenv("TELEGRAM_CHAT_ID") or "").strip()
+    if not token or not chat_id:
+        print("Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID; 12pm report not sent.", flush=True)
+        return
+    send_telegram_message(msg_part1, token, chat_id)
+    send_telegram_message(msg_part2, token, chat_id)
+    print("12pm tracking report sent (Part 1 + Part 2).", flush=True)
+
+
 def _criteria_count(r: dict) -> int:
     """Count how many of 1D, 1W, 1M criteria the asset passes."""
     return sum(1 for k in ("passes_day", "passes_week", "passes_month") if r.get(k))
@@ -1155,10 +1306,15 @@ def main() -> None:
     # Load configuration
     config = load_config("config.yaml")
     
-    # Determine which delivery slot we're in (0=8am, 1=4pm, 2=5pm, 3=8pm)
+    # Determine which delivery slot we're in (0=8am, 1=12pm, 2=4pm, 3=5pm, 4=8pm)
     next_delivery_target, delivery_slot_index = _get_next_delivery_target(config)
-    REPORT_SLOTS = ["8am", "4pm", "5pm", "8pm"]
+    REPORT_SLOTS = ["8am", "12pm", "4pm", "5pm", "8pm"]
     report_slot = REPORT_SLOTS[delivery_slot_index] if delivery_slot_index is not None else None
+
+    # 12pm = tracking log only (no screener run)
+    if report_slot == "12pm":
+        _run_12pm_tracking_report(config)
+        return
 
     # Manual trigger: send slot 0 report (8am pre-market) right now
     force_report_1 = (os.getenv("MARKETSCOUT_REPORT_1") or "").strip().lower() in ("1", "true", "yes")
@@ -1196,6 +1352,8 @@ def main() -> None:
     # This way message 4 is always populated even if the job times out or gets rate-limited during stocks.
     print("Scanning Crypto...")
     crypto_results = run_crypto_screener(config)
+    if report_slot == "4pm":
+        crypto_results = [r for r in crypto_results if r.get("symbol") in ("BTC-USD", "ETH-USD")]
     print("Scanning Forex...")
     forex_results = run_forex_screener(config)
     print("Scanning Commodities...")
@@ -1220,12 +1378,20 @@ def main() -> None:
     commodity_count = len(commodity_results)
     etf_count = len(etf_results)
 
-    # All slots: full report (indices, stocks, ETFs, crypto, commodities, forex)
+    # 8am / 5pm / 8pm: only indices, stocks, ETFs (no crypto, forex, commodities in message)
+    if report_slot in ("8am", "5pm", "8pm"):
+        results_for_message = [r for r in all_results if r.get("sector") not in ("Crypto", "Forex", "Commodities")]
+        _crypto_count = _forex_count = _commodity_count = 0
+    else:
+        results_for_message = all_results
+        _crypto_count, _forex_count, _commodity_count = crypto_count, forex_count, commodity_count
+
+    # All slots: full report (for 8am/5pm/8pm: indices + stocks + ETFs only)
     msg_indices, msg_big, msg_rising, msg_rest = format_stock_message(
-        all_results,
-        crypto_count=crypto_count,
-        forex_count=forex_count,
-        commodity_count=commodity_count,
+        results_for_message,
+        crypto_count=_crypto_count,
+        forex_count=_forex_count,
+        commodity_count=_commodity_count,
         etf_count=etf_count,
         indices_data=indices_data,
         etf_asset_class_order=config.get("etf_asset_class_order"),
@@ -1279,13 +1445,21 @@ def main() -> None:
         if report_slot == "8pm":
             stocks_8pm = [r for r in all_results if r.get("sector") not in non_stock and r.get("passes_day")]
             _log_price_tracking_archive(stocks_8pm, "8pm", config)
+            _append_appearance_log(stocks_8pm, "8pm", config)
         elif report_slot == "4pm":
             stocks_full = [r for r in all_results if r.get("sector") not in non_stock]
             stocks_with_pct, _ = _log_price_tracking_archive(stocks_full, "4pm", config)
+            _append_appearance_log(all_results, "4pm", config)
             tracking_msg = _format_tracking_summary_4pm(stocks_with_pct, collection_time=collection_time) if stocks_with_pct else _format_tracking_no_data_4pm(collection_time=collection_time)
             if tracking_msg:
                 send_telegram_message(tracking_msg, token, chat_id)
                 print("  Price tracking summary (4pm vs yesterday 8pm) sent to Telegram", flush=True)
+        elif report_slot == "5pm":
+            stocks_5pm = [r for r in all_results if r.get("sector") not in non_stock and r.get("passes_day")]
+            _append_appearance_log(stocks_5pm, "5pm", config)
+        elif report_slot == "8am":
+            stocks_8am = [r for r in all_results if r.get("sector") not in non_stock and r.get("passes_day")]
+            _append_appearance_log(stocks_8am, "8am", config)
 
         # Charts only for 4pm report
         if report_slot == "4pm":

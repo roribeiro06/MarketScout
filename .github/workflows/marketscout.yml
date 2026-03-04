@@ -4,10 +4,11 @@ on:
   workflow_dispatch:
   schedule:
     # Start ~1h before ET delivery; script waits until delivery time then sends.
-    - cron: "0 12 * * *"   # 7am EDT → deliver at 8:00 AM ET (pre-market 4am→8am)
-    - cron: "0 19 * * *"   # 3pm EDT → deliver at 4:00 PM ET (regular 9:30am→4pm)
-    - cron: "0 20 * * *"   # 4pm EDT → deliver at 5:00 PM ET (4pm→5pm post-market)
-    - cron: "0 23 * * *"   # 7pm EDT → deliver at 8:00 PM ET (4pm→8pm post-market)
+    - cron: "0 12 * * *"   # 7am EDT → 8:00 AM ET (pre-market)
+    - cron: "0 16 * * *"   # 11am EDT → 12:00 PM ET (tracking log)
+    - cron: "0 19 * * *"   # 3pm EDT → 4:00 PM ET (regular 9:30→4pm)
+    - cron: "0 20 * * *"   # 4pm EDT → 5:00 PM ET (4pm→5pm post-market)
+    - cron: "0 23 * * *"   # 7pm EDT → 8:00 PM ET (4pm→8pm post-market)
 
 jobs:
   run-screener:
