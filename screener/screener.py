@@ -254,22 +254,28 @@ def _evaluate_stock_data(
             except Exception:
                 pass
 
+        # regular_session_close = today's 4pm close (before any pre/post-market overlay)
+        regular_session_close = float(data["Close"].iloc[-1]) if len(data) > 0 else None
+        regular_session_open = float(data["Open"].iloc[-1]) if len(data) > 0 and "Open" in data.columns else None
+
+        pct_4pm_to_8pm = None
         # Overlay live post-market or pre-market price when available
-        if live_price is not None and isinstance(live_price, (int, float)) and prev_close and prev_close > 0:
+        if live_price is not None and isinstance(live_price, (int, float)):
             try:
                 p = float(live_price)
                 if p > 0:
                     current_price = p
-                    one_day_change = ((current_price - prev_close) / prev_close) * 100
-                    if use_postmarket_prices:
-                        passes_day = abs(one_day_change) >= 3.0  # 8pm report: +/-3% during post-market
-                    else:
+                    if use_postmarket_prices and regular_session_close and regular_session_close > 0:
+                        # 1D = market open → market close (regular session only)
+                        if regular_session_open and regular_session_open > 0:
+                            one_day_change = ((regular_session_close - regular_session_open) / regular_session_open) * 100
+                        pct_4pm_to_8pm = ((current_price - regular_session_close) / regular_session_close) * 100
+                        passes_day = abs(pct_4pm_to_8pm) >= 3.0
+                    elif prev_close and prev_close > 0:
+                        one_day_change = ((current_price - prev_close) / prev_close) * 100
                         passes_day = _passes_pct(one_day_change, "one_day_pct_high", "one_day_pct_low", "one_day_pct_abs")
             except (TypeError, ValueError):
                 pass
-
-        # regular_session_close = today's 4pm close (before any pre/post-market overlay)
-        regular_session_close = float(data["Close"].iloc[-1]) if len(data) > 0 else None
         out = {
             "symbol": symbol,
             "company_name": company_name,
@@ -292,6 +298,8 @@ def _evaluate_stock_data(
             out["display_sector"] = display_sector
         if target_price is not None:
             out["target_price"] = target_price
+        if pct_4pm_to_8pm is not None:
+            out["pct_4pm_to_8pm"] = round(pct_4pm_to_8pm, 2)
         return out
 
     return None

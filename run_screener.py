@@ -276,7 +276,7 @@ def _get_next_delivery_target(config: dict):
 
 def _pct_sort_key(item: dict) -> tuple:
     """Sort key: largest move in any period that fit the criteria first (by magnitude)."""
-    d = item.get("one_day_pct")
+    d = item.get("pct_4pm_to_8pm") if item.get("pct_4pm_to_8pm") is not None else item.get("one_day_pct")
     w = item.get("one_week_pct")
     m = item.get("one_month_pct")
     vals = []
@@ -567,8 +567,8 @@ def _append_section_block(
     return message
 
 
-def _format_one_stock_block(stocks: list) -> str:
-    """Format a list of stocks (big or rising stars) into a message block."""
+def _format_one_stock_block(stocks: list, day_label: Optional[str] = None) -> str:
+    """Format a list of stocks (big or rising stars) into a message block. day_label: optional override (e.g. post-market shows 1D + 4pm→8pm)."""
     if not stocks:
         return ""
     lines = []
@@ -581,7 +581,11 @@ def _format_one_stock_block(stocks: list) -> str:
         vol_shares = vol / 1_000_000
         dollar_vol = (vol * price) / 1_000_000
         lead = "🟡 " if _all_three_pass(stock) else ""
-        d_str = _pct_str_no_pct("1D", stock["one_day_pct"], stock["passes_day"])
+        d_str = _pct_str_no_pct("1D", stock["one_day_pct"], stock["passes_day"] if stock.get("pct_4pm_to_8pm") is None else False)
+        pct_4pm = stock.get("pct_4pm_to_8pm")
+        if pct_4pm is not None:
+            pm_str = _pct_str_no_pct("4pm→8pm", pct_4pm, stock["passes_day"])
+            d_str = f"{d_str} | {pm_str}"
         w_str = _pct_str_no_pct("1W", stock["one_week_pct"], stock["passes_week"])
         m_val = stock.get("one_month_pct")
         m_pass = stock.get("passes_month", False)
@@ -754,8 +758,8 @@ def format_premarket_messages(
                 msg_indices += f"  {d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str} | {three_yr_str}\n\n"
         messages.append((msg_indices.strip() + SECTION_END).strip())
 
-    msg_stocks = time_header + "📊 <b>MarketScout — Post-market (2/2) Stocks (1D criteria, live after-hours)</b>\n\n"
-    msg_stocks += f"Stocks matching 1-day move (live post-market prices, same volume criteria): {len(stocks_1d)}\n\n"
+    msg_stocks = time_header + "📊 <b>MarketScout — Post-market (2/2) Stocks (4pm → 8pm)</b>\n\n"
+    msg_stocks += f"Stocks with ±3% move from 4pm close to 8pm post-market (same volume criteria as 4pm): {len(stocks_1d)}\n\n"
     msg_stocks += _format_one_stock_block(stocks_1d) + SECTION_END
     messages.append(msg_stocks.strip())
 
