@@ -1448,12 +1448,8 @@ def main() -> None:
             _append_appearance_log(stocks_8pm, "8pm", config)
         elif report_slot == "4pm":
             stocks_full = [r for r in all_results if r.get("sector") not in non_stock]
-            stocks_with_pct, _ = _log_price_tracking_archive(stocks_full, "4pm", config)
+            _log_price_tracking_archive(stocks_full, "4pm", config)
             _append_appearance_log(all_results, "4pm", config)
-            tracking_msg = _format_tracking_summary_4pm(stocks_with_pct, collection_time=collection_time) if stocks_with_pct else _format_tracking_no_data_4pm(collection_time=collection_time)
-            if tracking_msg:
-                send_telegram_message(tracking_msg, token, chat_id)
-                print("  Price tracking summary (4pm vs yesterday 8pm) sent to Telegram", flush=True)
         elif report_slot == "5pm":
             stocks_5pm = [r for r in all_results if r.get("sector") not in non_stock and r.get("passes_day")]
             _append_appearance_log(stocks_5pm, "5pm", config)
