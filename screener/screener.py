@@ -205,8 +205,8 @@ def _evaluate_stock_data(
         passes_volume = dollar_volume > min_dv
     passes_price = current_price >= thresholds.get("min_price", 0)  # Default to 0 if not specified
     
-    # Stock passes if it meets at least one of the three % criteria (1D, 1W, 1M) AND volume AND price
-    if passes_volume and passes_price and (passes_day or passes_week or passes_month):
+    # Stock passes if: volume AND price AND (1D or 1W or 1M, or for 8pm we'll check 4pm→8pm after overlay)
+    if passes_volume and passes_price and (passes_day or passes_week or passes_month or use_postmarket_prices):
         
         # Fetch company name and sector (use override_sector for rising stars; display_sector = real sector for display)
         company_name = symbol
@@ -300,6 +300,9 @@ def _evaluate_stock_data(
             out["target_price"] = target_price
         if pct_4pm_to_8pm is not None:
             out["pct_4pm_to_8pm"] = round(pct_4pm_to_8pm, 2)
+        # 8pm report: only include stocks with ±3% move from 4pm to 8pm
+        if use_postmarket_prices and not passes_day:
+            return None
         return out
 
     return None

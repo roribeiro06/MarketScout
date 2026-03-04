@@ -598,7 +598,11 @@ def _format_one_stock_block(stocks: list, day_label: Optional[str] = None) -> st
         three_yr_str = f"3Y: {three_yr_val:+.2f}" if three_yr_val is not None else "3Y: —"
         change_str = f"{d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str} | {three_yr_str}"
         tp = stock.get("target_price")
-        price_str = f"${price:.2f}" + (f" (1Y: ${tp:.2f})" if tp is not None else "")
+        p4 = stock.get("regular_session_close")
+        if pct_4pm is not None and p4 is not None:
+            price_str = f"4pm: ${p4:.2f} → 8pm: ${price:.2f}" + (f" (1Y: ${tp:.2f})" if tp is not None else "")
+        else:
+            price_str = f"${price:.2f}" + (f" (1Y: ${tp:.2f})" if tp is not None else "")
         lines.append(f"{lead}<b>{html.escape(company_name)} ({symbol})</b> {price_str}")
         lines.append(f"  <i>{sector_name}</i>")
         lines.append(f"  {change_str}")
