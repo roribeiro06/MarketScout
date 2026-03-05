@@ -1020,6 +1020,7 @@ def _run_12pm_tracking_report(config: dict) -> None:
     msg_part2 = time_header + "📋 <b>MarketScout — 12pm Tracking (Part 2: 8am/5pm/8pm, 3 days)</b>\n\n"
     msg_part2 += "Assets that appeared in 8am/5pm/8pm in last 3 days (today's price + logged moves):\n\n"
     for sym in sorted(by_sym_short.keys()):
+        entries = by_sym_short[sym]
         name = next((r[2] for r in rows_short if r[1] == sym), sym)
         cur = prices.get(sym)
         cur_str = f"${cur:.2f}" if cur is not None else "—"
@@ -1313,11 +1314,6 @@ def main() -> None:
     REPORT_SLOTS = ["8am", "12pm", "4pm", "5pm", "8pm"]
     report_slot = REPORT_SLOTS[delivery_slot_index] if delivery_slot_index is not None else None
 
-    # 12pm = tracking log only (no screener run)
-    if report_slot == "12pm":
-        _run_12pm_tracking_report(config)
-        return
-
     # Manual trigger: send slot 0 report (8am pre-market) right now
     force_report_1 = (os.getenv("MARKETSCOUT_REPORT_1") or "").strip().lower() in ("1", "true", "yes")
     if force_report_1:
@@ -1333,6 +1329,11 @@ def main() -> None:
         report_slot = "8pm"
         next_delivery_target = None  # send when scan is done, no wait
         print("MARKETSCOUT_REPORT_8PM=1: building 8pm report and sending when done.", flush=True)
+
+    # 12pm = tracking log only (no screener run)
+    if report_slot == "12pm":
+        _run_12pm_tracking_report(config)
+        return
     
     # Check if dry-run mode
     dry_run = config.get("dry_run", False)
