@@ -4,11 +4,12 @@ on:
   workflow_dispatch:
   schedule:
     # Start ~10min before ET delivery so scan captures max movement; script waits until delivery time then sends.
+    # 8pm: start at 8pm ET, send when scan is done (no wait).
     - cron: "50 11 * * *"  # 7:50am EDT → 8:00 AM ET (pre-market)
     - cron: "50 15 * * *"  # 11:50am EDT → 12:00 PM ET (tracking log)
     - cron: "50 19 * * *"  # 3:50pm EDT → 4:00 PM ET (regular 9:30→4pm)
     - cron: "50 20 * * *"  # 4:50pm EDT → 5:00 PM ET (4pm→5pm post-market)
-    - cron: "50 23 * * *"  # 7:50pm EDT → 8:00 PM ET (4pm→8pm post-market)
+    - cron: "0 0 * * *"    # midnight UTC = 8:00 PM ET (4pm→8pm; scan at 8pm, send when done)
 
 jobs:
   run-screener:

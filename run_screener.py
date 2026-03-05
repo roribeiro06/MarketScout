@@ -247,7 +247,8 @@ def send_telegram_media_group(photo_paths: list, token: str, chat_id: str) -> No
 
 
 def _get_next_delivery_target(config: dict):
-    """Return (next_target_datetime_et, index_in_list) or (None, None). Index 0 = first slot = premarket run."""
+    """Return (next_target_datetime_et, index_in_list) or (None, None). Index 0 = first slot = premarket run.
+    Uses a 5-min window so when the job runs at 8pm ET we get the 8pm slot and send when done."""
     delivery_times = config.get("delivery_times_et") or []
     if isinstance(delivery_times, str):
         delivery_times = [delivery_times]
@@ -255,6 +256,7 @@ def _get_next_delivery_target(config: dict):
         return None, None
     now_et = datetime.now(ZoneInfo("America/New_York"))
     today = now_et.date()
+    cutoff = now_et - timedelta(minutes=5)  # so 8pm run gets 8pm slot
     next_target = None
     next_index = None
     for i, s in enumerate(delivery_times):
@@ -267,7 +269,7 @@ def _get_next_delivery_target(config: dict):
             h, m = int(parts[0]), int(parts[1])
             if 0 <= h <= 23 and 0 <= m <= 59:
                 target = datetime(today.year, today.month, today.day, h, m, 0, tzinfo=ZoneInfo("America/New_York"))
-                if target > now_et and (next_target is None or target < next_target):
+                if target >= cutoff and (next_target is None or target < next_target):
                     next_target = target
                     next_index = i
         except (ValueError, TypeError):
@@ -1323,6 +1325,14 @@ def main() -> None:
         report_slot = "8am"
         next_delivery_target = None  # send immediately, no wait
         print("MARKETSCOUT_REPORT_1=1: building 8am report and sending immediately.", flush=True)
+
+    # Manual trigger: send 8pm report right now (scan and send when done)
+    force_report_8pm = (os.getenv("MARKETSCOUT_REPORT_8PM") or "").strip().lower() in ("1", "true", "yes")
+    if force_report_8pm:
+        delivery_slot_index = 4
+        report_slot = "8pm"
+        next_delivery_target = None  # send when scan is done, no wait
+        print("MARKETSCOUT_REPORT_8PM=1: building 8pm report and sending when done.", flush=True)
     
     # Check if dry-run mode
     dry_run = config.get("dry_run", False)
@@ -1426,9 +1436,11 @@ def main() -> None:
         if not chat_id.lstrip("-").isdigit():
             print("Warning: TELEGRAM_CHAT_ID should be numeric (e.g. 123456789 or -1001234567890 for groups).", flush=True)
 
-        # If delivery_times_et is set, wait until the next target time today (Eastern) before sending
-        # Set env MARKETSCOUT_SEND_NOW=1 to skip wait and send immediately (e.g. when testing manually).
+        # If delivery_times_et is set, wait until the next target time today (Eastern) before sending.
+        # 8pm report: start at 8pm and send when done (no wait). Set env MARKETSCOUT_SEND_NOW=1 to skip wait for any slot.
         send_now = (os.getenv("MARKETSCOUT_SEND_NOW") or "").strip().lower() in ("1", "true", "yes")
+        if report_slot == "8pm":
+            next_delivery_target = None  # 8pm: scan starts at 8pm, send whenever done
         if not send_now and next_delivery_target is not None:
             now_et = datetime.now(ZoneInfo("America/New_York"))
             wait_sec = (next_delivery_target - now_et).total_seconds()
