@@ -168,13 +168,12 @@ def _evaluate_stock_data(
     if thresholds_override is not None:
         thresholds = {**thresholds, **thresholds_override}
 
-    # Calculate changes (use available days, not fixed). 126/252/756 ≈ 6M/1Y/3Y trading days
+    # Calculate changes (use available days, not fixed). 126/252 ≈ 6M/1Y trading days
     one_day_change = calculate_percent_change(data, 1)
     one_week_change = calculate_percent_change(data, min(5, len(data) - 1))
     one_month_change = calculate_percent_change(data, min(20, len(data) - 1))
     one_6m_change = calculate_percent_change(data, min(126, len(data) - 1))
     one_year_change = calculate_percent_change(data, min(252, len(data) - 1))
-    three_year_change = calculate_percent_change(data, min(756, len(data) - 1))
     
     # Allow None for month if we don't have enough data, but require day and week
     if one_day_change is None or one_week_change is None:
@@ -304,7 +303,6 @@ def _evaluate_stock_data(
             "one_month_pct": round(one_month_change, 2) if one_month_change is not None else None,
             "one_6m_pct": round(one_6m_change, 2) if one_6m_change is not None else None,
             "one_year_pct": round(one_year_change, 2) if one_year_change is not None else None,
-            "three_year_pct": round(three_year_change, 2) if three_year_change is not None else None,
             "passes_day": passes_day,
             "passes_week": passes_week,
             "passes_month": passes_month,
@@ -506,7 +504,6 @@ def screen_crypto(symbol: str, name: str, config: Dict) -> Optional[Dict]:
     one_month_change = calculate_percent_change(data, min(20, len(data) - 1))
     one_6m_change = calculate_percent_change(data, min(126, len(data) - 1))
     one_year_change = calculate_percent_change(data, min(252, len(data) - 1))
-    three_year_change = calculate_percent_change(data, min(756, len(data) - 1))
     
     if one_day_change is None or one_week_change is None:
         return None
@@ -532,7 +529,6 @@ def screen_crypto(symbol: str, name: str, config: Dict) -> Optional[Dict]:
         "one_month_pct": round(one_month_change, 2) if one_month_change is not None else None,
         "one_6m_pct": round(one_6m_change, 2) if one_6m_change is not None else None,
         "one_year_pct": round(one_year_change, 2) if one_year_change is not None else None,
-        "three_year_pct": round(three_year_change, 2) if three_year_change is not None else None,
         "passes_day": passes_day,
         "passes_week": passes_week,
         "passes_month": passes_month,
@@ -582,7 +578,6 @@ def screen_forex(symbol: str, name: str, config: Dict) -> Optional[Dict]:
     one_month_change = calculate_percent_change(data, min(20, len(data) - 1))
     one_6m_change = calculate_percent_change(data, min(126, len(data) - 1))
     one_year_change = calculate_percent_change(data, min(252, len(data) - 1))
-    three_year_change = calculate_percent_change(data, min(756, len(data) - 1))
     
     if one_day_change is None or one_week_change is None:
         return None
@@ -608,7 +603,6 @@ def screen_forex(symbol: str, name: str, config: Dict) -> Optional[Dict]:
         "one_month_pct": round(one_month_change, 2) if one_month_change is not None else None,
         "one_6m_pct": round(one_6m_change, 2) if one_6m_change is not None else None,
         "one_year_pct": round(one_year_change, 2) if one_year_change is not None else None,
-        "three_year_pct": round(three_year_change, 2) if three_year_change is not None else None,
         "passes_day": passes_day,
         "passes_week": passes_week,
         "passes_month": passes_month,
@@ -659,7 +653,6 @@ def screen_commodity(symbol: str, name: str, config: Dict) -> Optional[Dict]:
     one_month_change = calculate_percent_change(data, min(20, len(data) - 1))
     one_6m_change = calculate_percent_change(data, min(126, len(data) - 1))
     one_year_change = calculate_percent_change(data, min(252, len(data) - 1))
-    three_year_change = calculate_percent_change(data, min(756, len(data) - 1))
     
     if one_day_change is None or one_week_change is None:
         return None
@@ -686,7 +679,6 @@ def screen_commodity(symbol: str, name: str, config: Dict) -> Optional[Dict]:
         "one_month_pct": round(one_month_change, 2) if one_month_change is not None else None,
         "one_6m_pct": round(one_6m_change, 2) if one_6m_change is not None else None,
         "one_year_pct": round(one_year_change, 2) if one_year_change is not None else None,
-        "three_year_pct": round(three_year_change, 2) if three_year_change is not None else None,
         "passes_day": passes_day,
         "passes_week": passes_week,
         "passes_month": passes_month,
@@ -737,7 +729,6 @@ def screen_etf(symbol: str, name: str, asset_class: str, config: Dict) -> Option
     one_month_change = calculate_percent_change(data, min(20, len(data) - 1))
     one_6m_change = calculate_percent_change(data, min(126, len(data) - 1))
     one_year_change = calculate_percent_change(data, min(252, len(data) - 1))
-    three_year_change = calculate_percent_change(data, min(756, len(data) - 1))
     
     if one_day_change is None or one_week_change is None:
         return None
@@ -766,7 +757,6 @@ def screen_etf(symbol: str, name: str, asset_class: str, config: Dict) -> Option
         "one_month_pct": round(one_month_change, 2) if one_month_change is not None else None,
         "one_6m_pct": round(one_6m_change, 2) if one_6m_change is not None else None,
         "one_year_pct": round(one_year_change, 2) if one_year_change is not None else None,
-        "three_year_pct": round(three_year_change, 2) if three_year_change is not None else None,
         "passes_day": passes_day,
         "passes_week": passes_week,
         "passes_month": passes_month,

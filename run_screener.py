@@ -52,7 +52,7 @@ COMMODITY_CONTRACT_SIZE = {
 
 
 def get_indices_snapshot(use_postmarket: bool = False) -> List[Dict]:
-    """Fetch current level and 1D/1W/1M/6M/1Y/3Y % changes for indices. Uses live post-market or pre-market price when available."""
+    """Fetch current level and 1D/1W/1M/6M/1Y % changes for indices. Uses live post-market or pre-market price when available."""
     out = []
     for symbol, name in INDICES:
         try:
@@ -67,7 +67,6 @@ def get_indices_snapshot(use_postmarket: bool = False) -> List[Dict]:
             one_m = None
             one_6m = None
             one_1y = None
-            one_3y = None
             if len(data) >= 2:
                 one_d = ((data["Close"].iloc[-1] - prev_close) / prev_close) * 100
             if len(data) >= 6:
@@ -84,10 +83,6 @@ def get_indices_snapshot(use_postmarket: bool = False) -> List[Dict]:
                 n_1y = min(252, len(data) - 1)
                 p_1y = data["Close"].iloc[-(n_1y + 1)]
                 one_1y = ((data["Close"].iloc[-1] - p_1y) / p_1y) * 100
-            if len(data) >= 757:
-                n_3y = min(756, len(data) - 1)
-                p_3y = data["Close"].iloc[-(n_3y + 1)]
-                one_3y = ((data["Close"].iloc[-1] - p_3y) / p_3y) * 100
             # Overlay live post-market or pre-market price when available
             try:
                 info = ticker.info
@@ -111,7 +106,6 @@ def get_indices_snapshot(use_postmarket: bool = False) -> List[Dict]:
                 "one_month_pct": round(one_m, 2) if one_m is not None else None,
                 "one_6m_pct": round(one_6m, 2) if one_6m is not None else None,
                 "one_year_pct": round(one_1y, 2) if one_1y is not None else None,
-                "three_year_pct": round(one_3y, 2) if one_3y is not None else None,
                 "is_vix": symbol == "^VIX",
             })
         except Exception as e:
@@ -543,11 +537,9 @@ def _append_section_block(
         m_str = _pct_str_no_pct("1M", m_val, m_pass)
         six_val = stock.get("one_6m_pct")
         one_yr_val = stock.get("one_year_pct")
-        three_yr_val = stock.get("three_year_pct")
         six_str = f"6M: {six_val:+.2f}" if six_val is not None else "6M: —"
         one_yr_str = f"1Y: {one_yr_val:+.2f}" if one_yr_val is not None else "1Y: —"
-        three_yr_str = f"3Y: {three_yr_val:+.2f}" if three_yr_val is not None else "3Y: —"
-        change_str = f"{d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str} | {three_yr_str}"
+        change_str = f"{d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str}"
         sector_label = stock.get("sector", sector)
         if is_forex:
             message += f"{lead}<b>{html.escape(company_name)} ({symbol})</b> {price:.4f}\n"
@@ -595,11 +587,9 @@ def _format_one_stock_block(stocks: list, day_label: Optional[str] = None) -> st
         m_str = _pct_str_no_pct("1M", m_val, m_pass)
         six_val = stock.get("one_6m_pct")
         one_yr_val = stock.get("one_year_pct")
-        three_yr_val = stock.get("three_year_pct")
         six_str = f"6M: {six_val:+.2f}" if six_val is not None else "6M: —"
         one_yr_str = f"1Y: {one_yr_val:+.2f}" if one_yr_val is not None else "1Y: —"
-        three_yr_str = f"3Y: {three_yr_val:+.2f}" if three_yr_val is not None else "3Y: —"
-        change_str = f"{d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str} | {three_yr_str}"
+        change_str = f"{d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str}"
         tp = stock.get("target_price")
         p4 = stock.get("regular_session_close")
         if pct_4pm is not None and p4 is not None:
@@ -654,11 +644,9 @@ def format_deep_dive_message(
         m_str = _pct_str_no_pct("1M", stock.get("one_month_pct"), stock.get("passes_month"))
         six_val = stock.get("one_6m_pct")
         one_yr_val = stock.get("one_year_pct")
-        three_yr_val = stock.get("three_year_pct")
         six_str = f"6M: {six_val:+.2f}" if six_val is not None else "6M: —"
         one_yr_str = f"1Y: {one_yr_val:+.2f}" if one_yr_val is not None else "1Y: —"
-        three_yr_str = f"3Y: {three_yr_val:+.2f}" if three_yr_val is not None else "3Y: —"
-        msg += f"  {d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str} | {three_yr_str}\n"
+        msg += f"  {d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str}\n"
         if vol > 0:
             msg += f"  Vol: {vol_shares:.2f}M (${dollar_vol:.1f}M)\n"
         msg += "\n"
@@ -754,15 +742,13 @@ def format_premarket_messages(
                 m = idx.get("one_month_pct")
                 six = idx.get("one_6m_pct")
                 one_yr = idx.get("one_year_pct")
-                three_yr = idx.get("three_year_pct")
                 d_str = f"1D: {d:+.2f}" if d is not None else "1D: —"
                 w_str = f"1W: {w:+.2f}" if w is not None else "1W: —"
                 m_str = f"1M: {m:+.2f}" if m is not None else "1M: —"
                 six_str = f"6M: {six:+.2f}" if six is not None else "6M: —"
                 one_yr_str = f"1Y: {one_yr:+.2f}" if one_yr is not None else "1Y: —"
-                three_yr_str = f"3Y: {three_yr:+.2f}" if three_yr is not None else "3Y: —"
                 msg_indices += f"<b>{html.escape(name)} ({symbol})</b> {price:.2f}\n"
-                msg_indices += f"  {d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str} | {three_yr_str}\n\n"
+                msg_indices += f"  {d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str}\n\n"
         messages.append((msg_indices.strip() + SECTION_END).strip())
 
     msg_stocks = time_header + "📊 <b>MarketScout — Post-market (2/2) Stocks (4pm → 8pm)</b>\n\n"
@@ -1183,15 +1169,13 @@ def format_stock_message(
                 m = idx.get("one_month_pct")
                 six = idx.get("one_6m_pct")
                 one_yr = idx.get("one_year_pct")
-                three_yr = idx.get("three_year_pct")
                 d_str = f"1D: {d:+.2f}" if d is not None else "1D: —"
                 w_str = f"1W: {w:+.2f}" if w is not None else "1W: —"
                 m_str = f"1M: {m:+.2f}" if m is not None else "1M: —"
                 six_str = f"6M: {six:+.2f}" if six is not None else "6M: —"
                 one_yr_str = f"1Y: {one_yr:+.2f}" if one_yr is not None else "1Y: —"
-                three_yr_str = f"3Y: {three_yr:+.2f}" if three_yr is not None else "3Y: —"
                 msg_indices += f"<b>{html.escape(name)} ({symbol})</b> {price:.2f}\n"
-                msg_indices += f"  {d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str} | {three_yr_str}\n\n"
+                msg_indices += f"  {d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str}\n\n"
         msg_indices = (msg_indices.strip() + SECTION_END) if msg_indices.strip() else ""
 
     # ---------- Message 2: Big stocks (≥$2B vol) ----------
@@ -1248,11 +1232,9 @@ def format_stock_message(
                 m_str = _pct_str_no_pct("1M", m_val, m_pass)
                 six_val = stock.get("one_6m_pct")
                 one_yr_val = stock.get("one_year_pct")
-                three_yr_val = stock.get("three_year_pct")
                 six_str = f"6M: {six_val:+.2f}" if six_val is not None else "6M: —"
                 one_yr_str = f"1Y: {one_yr_val:+.2f}" if one_yr_val is not None else "1Y: —"
-                three_yr_str = f"3Y: {three_yr_val:+.2f}" if three_yr_val is not None else "3Y: —"
-                change_str = f"{d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str} | {three_yr_str}"
+                change_str = f"{d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str}"
                 tp = stock.get("target_price")
                 price_str = f"${price:.2f}" + (f" (1Y: ${tp:.2f})" if tp is not None else "")
                 msg_rest += f"{lead}<b>{html.escape(company_name)} ({symbol})</b> {price_str}\n"
@@ -1280,20 +1262,18 @@ def format_stock_message(
                 m_val = stock.get("one_month_pct")
                 m_pass = stock.get("passes_month", False)
                 m_str = _pct_str_no_pct("1M", m_val, m_pass)
-                six_val = stock.get("one_6m_pct")
-                one_yr_val = stock.get("one_year_pct")
-                three_yr_val = stock.get("three_year_pct")
-                six_str = f"6M: {six_val:+.2f}" if six_val is not None else "6M: —"
-                one_yr_str = f"1Y: {one_yr_val:+.2f}" if one_yr_val is not None else "1Y: —"
-                three_yr_str = f"3Y: {three_yr_val:+.2f}" if three_yr_val is not None else "3Y: —"
-                change_str = f"{d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str} | {three_yr_str}"
-                tp = stock.get("target_price")
-                price_str = f"${price:.2f}" + (f" (1Y: ${tp:.2f})" if tp is not None else "")
-                msg_rest += f"{lead}<b>{html.escape(company_name)} ({symbol})</b> {price_str}\n"
-                msg_rest += f"  <i>{ac_label}</i>\n"
-                msg_rest += f"  {change_str}\n"
-                msg_rest += f"  Vol: {vol_shares:.2f}M (${dollar_vol:.1f}M)\n"
-                msg_rest += "\n"
+        six_val = stock.get("one_6m_pct")
+        one_yr_val = stock.get("one_year_pct")
+        six_str = f"6M: {six_val:+.2f}" if six_val is not None else "6M: —"
+        one_yr_str = f"1Y: {one_yr_val:+.2f}" if one_yr_val is not None else "1Y: —"
+        change_str = f"{d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str}"
+        tp = stock.get("target_price")
+        price_str = f"${price:.2f}" + (f" (1Y: ${tp:.2f})" if tp is not None else "")
+        msg_rest += f"{lead}<b>{html.escape(company_name)} ({symbol})</b> {price_str}\n"
+        msg_rest += f"  <i>{ac_label}</i>\n"
+        msg_rest += f"  {change_str}\n"
+        msg_rest += f"  Vol: {vol_shares:.2f}M (${dollar_vol:.1f}M)\n"
+        msg_rest += "\n"
             msg_rest += "\n"
     if msg_rest.strip():
         msg_rest = time_header + "📊 <b>MarketScout (4/4) — Crypto, Commodities, Forex, ETFs</b>\n\n" + msg_rest.strip() + SECTION_END
