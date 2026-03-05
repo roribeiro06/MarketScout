@@ -1262,18 +1262,18 @@ def format_stock_message(
                 m_val = stock.get("one_month_pct")
                 m_pass = stock.get("passes_month", False)
                 m_str = _pct_str_no_pct("1M", m_val, m_pass)
-        six_val = stock.get("one_6m_pct")
-        one_yr_val = stock.get("one_year_pct")
-        six_str = f"6M: {six_val:+.2f}" if six_val is not None else "6M: —"
-        one_yr_str = f"1Y: {one_yr_val:+.2f}" if one_yr_val is not None else "1Y: —"
-        change_str = f"{d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str}"
-        tp = stock.get("target_price")
-        price_str = f"${price:.2f}" + (f" (1Y: ${tp:.2f})" if tp is not None else "")
-        msg_rest += f"{lead}<b>{html.escape(company_name)} ({symbol})</b> {price_str}\n"
-        msg_rest += f"  <i>{ac_label}</i>\n"
-        msg_rest += f"  {change_str}\n"
-        msg_rest += f"  Vol: {vol_shares:.2f}M (${dollar_vol:.1f}M)\n"
-        msg_rest += "\n"
+                six_val = stock.get("one_6m_pct")
+                one_yr_val = stock.get("one_year_pct")
+                six_str = f"6M: {six_val:+.2f}" if six_val is not None else "6M: —"
+                one_yr_str = f"1Y: {one_yr_val:+.2f}" if one_yr_val is not None else "1Y: —"
+                change_str = f"{d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str}"
+                tp = stock.get("target_price")
+                price_str = f"${price:.2f}" + (f" (1Y: ${tp:.2f})" if tp is not None else "")
+                msg_rest += f"{lead}<b>{html.escape(company_name)} ({symbol})</b> {price_str}\n"
+                msg_rest += f"  <i>{ac_label}</i>\n"
+                msg_rest += f"  {change_str}\n"
+                msg_rest += f"  Vol: {vol_shares:.2f}M (${dollar_vol:.1f}M)\n"
+                msg_rest += "\n"
             msg_rest += "\n"
     if msg_rest.strip():
         msg_rest = time_header + "📊 <b>MarketScout (4/4) — Crypto, Commodities, Forex, ETFs</b>\n\n" + msg_rest.strip() + SECTION_END
@@ -1317,6 +1317,14 @@ def main() -> None:
         report_slot = "5pm"
         next_delivery_target = None  # send when scan is done, no wait
         print("MARKETSCOUT_REPORT_5PM=1: building 5pm report and sending when done.", flush=True)
+
+    # Manual trigger: send 4pm report right now (9:30→4pm, 2-of-3 criteria, full universe)
+    force_report_4pm = (os.getenv("MARKETSCOUT_REPORT_4PM") or "").strip().lower() in ("1", "true", "yes")
+    if force_report_4pm:
+        delivery_slot_index = 2
+        report_slot = "4pm"
+        next_delivery_target = None  # send when scan is done, no wait
+        print("MARKETSCOUT_REPORT_4PM=1: building 4pm report and sending when done.", flush=True)
 
     # 12pm = tracking log only (no screener run)
     if report_slot == "12pm":
@@ -1426,10 +1434,12 @@ def main() -> None:
             print("Warning: TELEGRAM_CHAT_ID should be numeric (e.g. 123456789 or -1001234567890 for groups).", flush=True)
 
         # If delivery_times_et is set, wait until the next target time today (Eastern) before sending.
-        # 8pm report: start at 8pm and send when done (no wait). Set env MARKETSCOUT_SEND_NOW=1 to skip wait for any slot.
+        # 8pm report: start at 8pm and send when done (no wait). 4pm: start at 4pm and send when done.
         send_now = (os.getenv("MARKETSCOUT_SEND_NOW") or "").strip().lower() in ("1", "true", "yes")
         if report_slot == "8pm":
             next_delivery_target = None  # 8pm: scan starts at 8pm, send whenever done
+        if report_slot == "4pm":
+            next_delivery_target = None  # 4pm: scan starts at 4pm, send whenever done
         if not send_now and next_delivery_target is not None:
             now_et = datetime.now(ZoneInfo("America/New_York"))
             wait_sec = (next_delivery_target - now_et).total_seconds()

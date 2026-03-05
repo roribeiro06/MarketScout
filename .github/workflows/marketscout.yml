@@ -5,12 +5,12 @@ on:
   schedule:
     # 8am: start at 7:30am ET, send at 8:00am (script waits until 08:00 ET).
     # 12pm: start at 11:50am ET, send at 12:00pm.
-    # 4pm: start at 4:00pm ET, send at 4:30pm (regular 9:30→4pm report; script waits until 16:30 ET).
+    # 4pm: start at 4:00pm ET, send when scan is done (regular 9:30→4pm report).
     # 5pm: start at 4:40pm ET, send at 5:00pm (4pm→5pm post-market).
     # 8:30pm: start at 8:00pm ET, send when scan is done (4pm→8pm post-market; typically lands ~8:30pm).
     - cron: "30 11 * * *"  # 7:30am EDT → 8:00 AM ET (pre-market)
     - cron: "50 15 * * *"  # 11:50am EDT → 12:00 PM ET (tracking log)
-    - cron: "0 20 * * *"   # 4:00pm EDT → 4:30 PM ET (regular 9:30→4pm; scan at 4pm, send at 4:30)
+    - cron: "0 20 * * *"   # 4:00pm EDT → 4pm report (scan at 4pm, send when done)
     - cron: "40 20 * * *"  # 4:40pm EDT → 5:00 PM ET (4pm→5pm post-market; scan at 4:40)
     - cron: "0 0 * * *"    # midnight UTC = 8:00 PM ET (4pm→8pm; scan at 8pm, send when done)
 
