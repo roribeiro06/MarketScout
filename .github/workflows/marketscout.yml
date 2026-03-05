@@ -3,9 +3,9 @@ name: MarketScout Telegram notifications
 on:
   workflow_dispatch:
   schedule:
-    # Start ~10min before ET delivery so scan captures max movement; script waits until delivery time then sends.
+    # Script waits until delivery time then sends. 8am: start at 7:30am ET, send at 8am.
     # 8pm: start at 8pm ET, send when scan is done (no wait).
-    - cron: "50 11 * * *"  # 7:50am EDT → 8:00 AM ET (pre-market)
+    - cron: "30 11 * * *"  # 7:30am EDT → send at 8:00 AM ET (pre-market)
     - cron: "50 15 * * *"  # 11:50am EDT → 12:00 PM ET (tracking log)
     - cron: "50 19 * * *"  # 3:50pm EDT → 4:00 PM ET (regular 9:30→4pm)
     - cron: "50 20 * * *"  # 4:50pm EDT → 5:00 PM ET (4pm→5pm post-market)
