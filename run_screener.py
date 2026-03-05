@@ -1330,6 +1330,14 @@ def main() -> None:
         next_delivery_target = None  # send when scan is done, no wait
         print("MARKETSCOUT_REPORT_8PM=1: building 8pm report and sending when done.", flush=True)
 
+    # Manual trigger: send 5pm report right now (4pm→5pm post-market, send when done)
+    force_report_5pm = (os.getenv("MARKETSCOUT_REPORT_5PM") or "").strip().lower() in ("1", "true", "yes")
+    if force_report_5pm:
+        delivery_slot_index = 3
+        report_slot = "5pm"
+        next_delivery_target = None  # send when scan is done, no wait
+        print("MARKETSCOUT_REPORT_5PM=1: building 5pm report and sending when done.", flush=True)
+
     # 12pm = tracking log only (no screener run)
     if report_slot == "12pm":
         _run_12pm_tracking_report(config)
