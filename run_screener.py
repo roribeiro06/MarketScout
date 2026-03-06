@@ -1138,8 +1138,10 @@ def format_stock_message(
     indices_data: Optional[List[Dict]] = None,
     etf_asset_class_order: Optional[List[str]] = None,
     collection_time: Optional[str] = None,
+    report_slot: Optional[str] = None,
 ) -> Tuple[str, str, str, str]:
-    """Format into 4 Telegram messages: (1) Indices, (2) Big stocks, (3) Rising stars, (4) Crypto+Commodities+Forex+ETFs."""
+    """Format into 4 Telegram messages: (1) Indices, (2) Big stocks, (3) Rising stars, (4) Crypto+Commodities+Forex+ETFs.
+    For report_slot '8pm': labels clarify that stocks are those with ±3% move from 4pm close to 8pm post-market."""
     time_header = ("🕐 Yahoo data as of " + collection_time + "\n\n" if collection_time else "")
     non_stock = {"Crypto", "Forex", "Commodities", "ETFs"}
     by_sector = {}
@@ -1151,11 +1153,12 @@ def format_stock_message(
         key=lambda s: (s == "Other", s.upper()),
     )
     SECTION_EMOJI = {"Crypto": "🪙", "Commodities": "🌾", "Forex": "💵"}
+    is_8pm = report_slot == "8pm"
 
     # ---------- Message 1: Indices only ----------
     msg_indices = ""
     if indices_data:
-        header1 = time_header + "📊 <b>MarketScout (1/4) — Indices</b>"
+        header1 = time_header + ("📊 <b>MarketScout (1/4) — Indices (post-market)</b>" if is_8pm else "📊 <b>MarketScout (1/4) — Indices</b>")
         body1 = "<b>🌍 Indices</b>\n\n"
         for idx in sorted(indices_data, key=lambda x: (x.get("symbol") or x.get("name") or "").upper()):
             name = idx["name"]
@@ -1186,8 +1189,8 @@ def format_stock_message(
         big_stocks.extend(by_sector[s])
     msg_big = ""
     if big_stocks:
-        header2 = time_header + "📊 <b>MarketScout (2/4) — Stocks ≥$1B vol</b>"
-        body2 = f"Found {len(big_stocks)} stock(s) matching criteria:\n\n"
+        header2 = time_header + ("📊 <b>MarketScout (2/4) — Stocks ±3% from 4pm to 8pm (post-market)</b>" if is_8pm else "📊 <b>MarketScout (2/4) — Stocks ≥$1B vol</b>")
+        body2 = "Stocks with ±3% move from 4pm close to 8pm post-market (same volume criteria as 4pm):\n\n" if is_8pm else f"Found {len(big_stocks)} stock(s) matching criteria:\n\n"
         body2 += "<b>📈 Stocks (≥$1B vol)</b>\n"
         body2 += _format_one_stock_block(big_stocks)
         msg_big = _wrap_report(header2, body2.strip())
@@ -1196,8 +1199,8 @@ def format_stock_message(
     rising_stocks = by_sector.get("Rising Stars", [])
     msg_rising = ""
     if rising_stocks:
-        header3 = time_header + "📊 <b>MarketScout (3/4) — Rising Stars</b>"
-        body3 = f"Found {len(rising_stocks)} rising star(s) matching criteria:\n\n"
+        header3 = time_header + ("📊 <b>MarketScout (3/4) — Rising stars ±3% from 4pm to 8pm (post-market)</b>" if is_8pm else "📊 <b>MarketScout (3/4) — Rising Stars</b>")
+        body3 = "Rising stars with ±3% move from 4pm close to 8pm post-market:\n\n" if is_8pm else f"Found {len(rising_stocks)} rising star(s) matching criteria:\n\n"
         body3 += "<b>⭐ Rising Stars (250M–$1B vol)</b>\n"
         body3 += _format_one_stock_block(rising_stocks)
         msg_rising = _wrap_report(header3, body3.strip())
@@ -1393,7 +1396,8 @@ def main() -> None:
     commodity_count = len(commodity_results)
     etf_count = len(etf_results)
 
-    # 8am / 5pm / 8pm: only indices, stocks, ETFs (no crypto, forex, commodities in message)
+    # 8am / 5pm / 8pm: only indices, stocks, ETFs (no crypto, forex, commodities in message).
+    # 8pm: screener already restricts to stocks with ±3% move from 4pm close to 8pm post-market.
     if report_slot in ("8am", "5pm", "8pm"):
         results_for_message = [r for r in all_results if r.get("sector") not in ("Crypto", "Forex", "Commodities")]
         _crypto_count = _forex_count = _commodity_count = 0
@@ -1411,6 +1415,7 @@ def main() -> None:
         indices_data=indices_data,
         etf_asset_class_order=config.get("etf_asset_class_order"),
         collection_time=collection_time,
+        report_slot=report_slot,
     )
     messages = [msg_indices, msg_big, msg_rising, msg_rest]
 
