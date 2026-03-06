@@ -252,7 +252,8 @@ def send_telegram_media_group(photo_paths: list, token: str, chat_id: str) -> No
 
 def _get_next_delivery_target(config: dict):
     """Return (next_target_datetime_et, index_in_list) or (None, None). Index 0 = first slot = premarket run.
-    Uses a 5-min window so when the job runs at 8pm ET we get the 8pm slot and send when done."""
+    Uses a 5-min window so when the job runs at 8pm ET we get the 8pm slot and send when done.
+    If we're past the last delivery time today (e.g. job runs at 9pm), we still use the last slot (8pm) so the report goes out."""
     delivery_times = config.get("delivery_times_et") or []
     if isinstance(delivery_times, str):
         delivery_times = [delivery_times]
@@ -263,6 +264,8 @@ def _get_next_delivery_target(config: dict):
     cutoff = now_et - timedelta(minutes=5)  # so 8pm run gets 8pm slot
     next_target = None
     next_index = None
+    last_target = None
+    last_index = None
     for i, s in enumerate(delivery_times):
         if not s or not isinstance(s, str):
             continue
@@ -273,11 +276,15 @@ def _get_next_delivery_target(config: dict):
             h, m = int(parts[0]), int(parts[1])
             if 0 <= h <= 23 and 0 <= m <= 59:
                 target = datetime(today.year, today.month, today.day, h, m, 0, tzinfo=ZoneInfo("America/New_York"))
+                last_target, last_index = target, i
                 if target >= cutoff and (next_target is None or target < next_target):
                     next_target = target
                     next_index = i
         except (ValueError, TypeError):
             continue
+    # If no upcoming slot (e.g. job runs at 21:00 and last slot was 20:30), use last slot so 8pm report still goes out
+    if next_target is None and last_target is not None and now_et >= last_target:
+        return last_target, last_index
     return next_target, next_index
 
 
@@ -1292,7 +1299,10 @@ def main() -> None:
     REPORT_SLOTS = ["8am", "12pm", "4pm", "5pm", "8pm"]
     report_slot = REPORT_SLOTS[delivery_slot_index] if delivery_slot_index is not None else None
 
-    # Manual trigger: send slot 0 report (8am pre-market) right now
+    if report_slot is None:
+        print("No delivery slot selected: current time is outside all delivery_times_et windows. Check config and run time (ET).", flush=True)
+        return
+    print(f"Report slot: {report_slot}", flush=True)
     force_report_1 = (os.getenv("MARKETSCOUT_REPORT_1") or "").strip().lower() in ("1", "true", "yes")
     if force_report_1:
         delivery_slot_index = 0
@@ -1431,11 +1441,11 @@ def main() -> None:
         if not chat_id.lstrip("-").isdigit():
             print("Warning: TELEGRAM_CHAT_ID should be numeric (e.g. 123456789 or -1001234567890 for groups).", flush=True)
 
-        # If delivery_times_et is set, wait until the next target time today (Eastern) before sending.
-        # 8pm report: start at 8pm and send when done (no wait). 4pm: start at 4pm and send when done.
+        # 8pm report: scan starts when job runs at 8pm ET; send as soon as report is ready (no wait).
+        # 4pm report: same — send when done.
         send_now = (os.getenv("MARKETSCOUT_SEND_NOW") or "").strip().lower() in ("1", "true", "yes")
         if report_slot == "8pm":
-            next_delivery_target = None  # 8pm: scan starts at 8pm, send whenever done
+            next_delivery_target = None  # scan at 8pm, send whenever ready
         if report_slot == "4pm":
             next_delivery_target = None  # 4pm: scan starts at 4pm, send whenever done
         if not send_now and next_delivery_target is not None:
