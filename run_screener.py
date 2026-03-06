@@ -115,6 +115,16 @@ def get_indices_snapshot(use_postmarket: bool = False) -> List[Dict]:
 
 TELEGRAM_MAX_MESSAGE_LENGTH = 4096
 
+# Report layout: white line, header, white line, body, white line, footer (= header), white line
+WHITE_LINE = "⚪⚪⚪⚪⚪⚪⚪⚪⚪⚪"
+
+
+def _wrap_report(header: str, body: str) -> str:
+    """Wrap message with white lines above/below header and footer (footer = header)."""
+    h = header.strip()
+    b = body.strip()
+    return f"{WHITE_LINE}\n\n{h}\n\n{WHITE_LINE}\n\n{b}\n\n{WHITE_LINE}\n\n{h}\n\n{WHITE_LINE}"
+
 
 def _telegram_400_hint(response_text: str) -> str:
     """Return a short hint from Telegram 400 response for logging."""
@@ -617,11 +627,9 @@ def format_deep_dive_message(
     if not qualifying:
         return ""
 
-    SECTION_END = "\n\n🔵🔵🔵🔵🔵🔵🔵🔵🔵🔵"
     time_header = ("🕐 Yahoo data as of " + collection_time + "\n\n" if collection_time else "")
-    msg = time_header + f"📊 <b>MarketScout — {title}</b>\n\n"
-    msg += f"Stocks in this report: <b>{len(qualifying)}</b>\n\n"
-    msg += intro + "\n\n"
+    header = time_header + f"📊 <b>MarketScout — {title}</b>\n\n" + f"Stocks in this report: <b>{len(qualifying)}</b>\n\n" + intro
+    msg = ""
 
     # Brief pause before fetching financials (helps avoid Yahoo rate limit after stock scan)
     time.sleep(6.0)
@@ -704,7 +712,7 @@ def format_deep_dive_message(
             msg += "  Income statement: Operating income/Revenue = — (ideally above 15%)\n"
 
         msg += "\n"
-    return (msg.strip() + SECTION_END).strip()
+    return _wrap_report(header, msg)
 
 
 def format_premarket_messages(
@@ -722,12 +730,12 @@ def format_premarket_messages(
         r for r in all_results
         if r.get("sector") not in non_stock and r.get("passes_day")
     ]
-    SECTION_END = "\n\n🔵🔵🔵🔵🔵🔵🔵🔵🔵🔵"
     time_header = ("🕐 Yahoo data as of " + collection_time + "\n\n" if collection_time else "")
     messages = []
 
     if indices_data:
-        msg_indices = time_header + "📊 <b>MarketScout — Post-market (1/2) Indices</b>\n\n<b>🌍 Indices</b>\n"
+        header = time_header + "📊 <b>MarketScout — Post-market (1/2) Indices</b>"
+        body = "<b>🌍 Indices</b>\n"
         for idx in indices_data:
             name = idx["name"]
             symbol = idx["symbol"]
@@ -735,7 +743,7 @@ def format_premarket_messages(
             if idx.get("is_vix"):
                 d = idx.get("one_day_pct")
                 change = f"  1D: {d:+.2f}" if d is not None else ""
-                msg_indices += f"<b>{html.escape(name)} ({symbol})</b> {price:.2f}{change}\n\n"
+                body += f"<b>{html.escape(name)} ({symbol})</b> {price:.2f}{change}\n\n"
             else:
                 d = idx.get("one_day_pct")
                 w = idx.get("one_week_pct")
@@ -747,14 +755,14 @@ def format_premarket_messages(
                 m_str = f"1M: {m:+.2f}" if m is not None else "1M: —"
                 six_str = f"6M: {six:+.2f}" if six is not None else "6M: —"
                 one_yr_str = f"1Y: {one_yr:+.2f}" if one_yr is not None else "1Y: —"
-                msg_indices += f"<b>{html.escape(name)} ({symbol})</b> {price:.2f}\n"
-                msg_indices += f"  {d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str}\n\n"
-        messages.append((msg_indices.strip() + SECTION_END).strip())
+                body += f"<b>{html.escape(name)} ({symbol})</b> {price:.2f}\n"
+                body += f"  {d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str}\n\n"
+        messages.append(_wrap_report(header, body.strip()))
 
-    msg_stocks = time_header + "📊 <b>MarketScout — Post-market (2/2) Stocks (4pm → 8pm)</b>\n\n"
-    msg_stocks += f"Stocks with ±3% move from 4pm close to 8pm post-market (same volume criteria as 4pm): {len(stocks_1d)}\n\n"
-    msg_stocks += _format_one_stock_block(stocks_1d) + SECTION_END
-    messages.append(msg_stocks.strip())
+    header_stocks = time_header + "📊 <b>MarketScout — Post-market (2/2) Stocks (4pm → 8pm)</b>"
+    body_stocks = f"Stocks with ±3% move from 4pm close to 8pm post-market (same volume criteria as 4pm): {len(stocks_1d)}\n\n"
+    body_stocks += _format_one_stock_block(stocks_1d)
+    messages.append(_wrap_report(header_stocks, body_stocks.strip()))
 
     return [m for m in messages if m]
 
@@ -847,10 +855,9 @@ def _format_tracking_summary_4pm(
     """Format 4pm tracking message: today 4pm vs yesterday 8pm."""
     if not stocks_with_pct:
         return ""
-    SECTION_END = "\n\n🔵🔵🔵🔵🔵🔵🔵🔵🔵🔵"
     time_header = ("🕐 " + (collection_time or "") + "\n\n" if collection_time else "")
-    msg = time_header + "📈 <b>MarketScout — Price Tracking (4pm vs yesterday 8pm)</b>\n\n"
-    msg += "Stocks in today's 4pm report that also appeared in yesterday's 8pm report:\n\n"
+    header = time_header + "📈 <b>MarketScout — Price Tracking (4pm vs yesterday 8pm)</b>"
+    body = "Stocks in today's 4pm report that also appeared in yesterday's 8pm report:\n\n"
     for s in sorted(stocks_with_pct, key=lambda x: -abs(float(x.get("pct_change_8pm_to_next_4pm", 0) or 0))):
         sym = s.get("symbol", "")
         name = (s.get("name") or sym).replace(",", ";")
@@ -858,19 +865,18 @@ def _format_tracking_summary_4pm(
         p4 = s.get("price_4pm", "")
         pct = s.get("pct_change_8pm_to_next_4pm", "")
         emoji = "🟢" if pct and float(pct) >= 0 else "🔴"
-        msg += f"{emoji} <b>{html.escape(name)} ({sym})</b>\n"
-        msg += f"  Yesterday 8pm: ${p8} → Today 4pm: ${p4} ({pct}%)\n\n"
-    return (msg.strip() + SECTION_END).strip()
+        body += f"{emoji} <b>{html.escape(name)} ({sym})</b>\n"
+        body += f"  Yesterday 8pm: ${p8} → Today 4pm: ${p4} ({pct}%)\n\n"
+    return _wrap_report(header, body.strip())
 
 
 def _format_tracking_no_data_4pm(collection_time: Optional[str] = None) -> str:
     """Format 4pm tracking message when there is no yesterday 8pm data to compare."""
-    SECTION_END = "\n\n🔵🔵🔵🔵🔵🔵🔵🔵🔵🔵"
     time_header = ("🕐 " + (collection_time or "") + "\n\n" if collection_time else "")
-    msg = time_header + "📈 <b>MarketScout — Price Tracking (4pm vs yesterday 8pm)</b>\n\n"
-    msg += "No yesterday 8pm data in the archive (e.g. the 8pm report did not run). "
-    msg += "The comparison will appear after the next 8pm report runs."
-    return (msg.strip() + SECTION_END).strip()
+    header = time_header + "📈 <b>MarketScout — Price Tracking (4pm vs yesterday 8pm)</b>"
+    body = "No yesterday 8pm data in the archive (e.g. the 8pm report did not run). "
+    body += "The comparison will appear after the next 8pm report runs."
+    return _wrap_report(header, body)
 
 
 def _append_appearance_log(
@@ -990,29 +996,28 @@ def _run_12pm_tracking_report(config: dict) -> None:
         except Exception:
             pass
 
-    SECTION_END = "\n\n🔵🔵🔵🔵🔵🔵🔵🔵🔵🔵"
     collection_time = now_et.strftime("%Y-%m-%d %H:%M %Z")
     time_header = "🕐 " + collection_time + "\n\n"
-    msg_part1 = time_header + "📋 <b>MarketScout — 12pm Tracking (Part 1: 4pm log, 6 months)</b>\n\n"
-    msg_part1 += "Assets that appeared in 4pm reports (today's price + logged 4pm % moves):\n\n"
+    header1 = time_header + "📋 <b>MarketScout — 12pm Tracking (Part 1: 4pm log, 6 months)</b>"
+    body1 = "Assets that appeared in 4pm reports (today's price + logged 4pm % moves):\n\n"
     for sym in symbols_4pm:
         name = next((r[2] for r in rows_4pm if r[1] == sym), sym)
         cur = prices.get(sym)
         cur_str = f"${cur:.2f}" if cur is not None else "—"
         log_str = "; ".join(f"{d} ({pct}%)" for d, pct in by_sym_4pm[sym])
-        msg_part1 += f"<b>{html.escape(name)} ({sym})</b> now {cur_str}\n  Log: {log_str}\n\n"
-    msg_part1 = (msg_part1.strip() + SECTION_END).strip()
+        body1 += f"<b>{html.escape(name)} ({sym})</b> now {cur_str}\n  Log: {log_str}\n\n"
+    msg_part1 = _wrap_report(header1, body1.strip())
 
-    msg_part2 = time_header + "📋 <b>MarketScout — 12pm Tracking (Part 2: 8am/5pm/8pm, 3 days)</b>\n\n"
-    msg_part2 += "Assets that appeared in 8am/5pm/8pm in last 3 days (today's price + logged moves):\n\n"
+    header2 = time_header + "📋 <b>MarketScout — 12pm Tracking (Part 2: 8am/5pm/8pm, 3 days)</b>"
+    body2 = "Assets that appeared in 8am/5pm/8pm in last 3 days (today's price + logged moves):\n\n"
     for sym in sorted(by_sym_short.keys()):
         entries = by_sym_short[sym]
         name = next((r[2] for r in rows_short if r[1] == sym), sym)
         cur = prices.get(sym)
         cur_str = f"${cur:.2f}" if cur is not None else "—"
         log_str = "; ".join(f"{d} {rpt} ({pct}%)" for d, rpt, pct in entries)
-        msg_part2 += f"<b>{html.escape(name)} ({sym})</b> now {cur_str}\n  Log: {log_str}\n\n"
-    msg_part2 = (msg_part2.strip() + SECTION_END).strip()
+        body2 += f"<b>{html.escape(name)} ({sym})</b> now {cur_str}\n  Log: {log_str}\n\n"
+    msg_part2 = _wrap_report(header2, body2.strip())
 
     token = (os.getenv("TELEGRAM_BOT_TOKEN") or "").strip()
     chat_id = (os.getenv("TELEGRAM_CHAT_ID") or "").strip()
@@ -1066,10 +1071,10 @@ def format_earnings_message(
     if not qualifying:
         return ""
 
-    SECTION_END = "\n\n🔵🔵🔵🔵🔵🔵🔵🔵🔵🔵"
     time_header = ("🕐 Yahoo data as of " + collection_time + "\n\n" if collection_time else "")
-    msg = time_header + "📅 <b>MarketScout — Earnings in the next 30 days</b>\n\n"
-    msg += "Stocks on the report (big or rising stars) with earnings in the next 30 days (ordered by nearest date):\n\n"
+    header = time_header + "📅 <b>MarketScout — Earnings in the next 30 days</b>\n\n"
+    header += "Stocks on the report (big or rising stars) with earnings in the next 30 days (ordered by nearest date):"
+    msg = ""
 
     time.sleep(1.5)
     today = datetime.now(ZoneInfo("America/New_York")).date()
@@ -1123,7 +1128,7 @@ def format_earnings_message(
         msg += f"  {d_str} | {w_str} | {m_str}\n"
         msg += f"  📅 Next earnings: {earnings_date or '—'}\n\n"
 
-    return (msg.strip() + SECTION_END).strip()
+    return _wrap_report(header, msg.strip())
 
 
 def format_stock_message(
@@ -1137,8 +1142,6 @@ def format_stock_message(
     collection_time: Optional[str] = None,
 ) -> Tuple[str, str, str, str]:
     """Format into 4 Telegram messages: (1) Indices, (2) Big stocks, (3) Rising stars, (4) Crypto+Commodities+Forex+ETFs."""
-    # Visual section end: white circles so each section is easy to spot
-    SECTION_END = "\n\n🔵🔵🔵🔵🔵🔵🔵🔵🔵🔵"
     time_header = ("🕐 Yahoo data as of " + collection_time + "\n\n" if collection_time else "")
     non_stock = {"Crypto", "Forex", "Commodities", "ETFs"}
     by_sector = {}
@@ -1154,7 +1157,8 @@ def format_stock_message(
     # ---------- Message 1: Indices only ----------
     msg_indices = ""
     if indices_data:
-        msg_indices = time_header + "📊 <b>MarketScout (1/4) — Indices</b>\n\n<b>🌍 Indices</b>\n"
+        header1 = time_header + "📊 <b>MarketScout (1/4) — Indices</b>"
+        body1 = "<b>🌍 Indices</b>\n\n"
         for idx in indices_data:
             name = idx["name"]
             symbol = idx["symbol"]
@@ -1162,7 +1166,7 @@ def format_stock_message(
             if idx.get("is_vix"):
                 d = idx.get("one_day_pct")
                 change = f"  1D: {d:+.2f}" if d is not None else ""
-                msg_indices += f"<b>{html.escape(name)} ({symbol})</b> {price:.2f}{change}\n\n"
+                body1 += f"<b>{html.escape(name)} ({symbol})</b> {price:.2f}{change}\n\n"
             else:
                 d = idx.get("one_day_pct")
                 w = idx.get("one_week_pct")
@@ -1174,9 +1178,9 @@ def format_stock_message(
                 m_str = f"1M: {m:+.2f}" if m is not None else "1M: —"
                 six_str = f"6M: {six:+.2f}" if six is not None else "6M: —"
                 one_yr_str = f"1Y: {one_yr:+.2f}" if one_yr is not None else "1Y: —"
-                msg_indices += f"<b>{html.escape(name)} ({symbol})</b> {price:.2f}\n"
-                msg_indices += f"  {d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str}\n\n"
-        msg_indices = (msg_indices.strip() + SECTION_END) if msg_indices.strip() else ""
+                body1 += f"<b>{html.escape(name)} ({symbol})</b> {price:.2f}\n"
+                body1 += f"  {d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str}\n\n"
+        msg_indices = _wrap_report(header1, body1.strip())
 
     # ---------- Message 2: Big stocks (≥$2B vol) ----------
     big_stocks = []
@@ -1184,19 +1188,21 @@ def format_stock_message(
         big_stocks.extend(by_sector[s])
     msg_big = ""
     if big_stocks:
-        msg_big = time_header + "📊 <b>MarketScout (2/4) — Stocks ≥$1B vol</b>\n\n"
-        msg_big += f"Found {len(big_stocks)} stock(s) matching criteria:\n\n"
-        msg_big += "<b>📈 Stocks (≥$1B vol)</b>\n"
-        msg_big += _format_one_stock_block(big_stocks) + SECTION_END
+        header2 = time_header + "📊 <b>MarketScout (2/4) — Stocks ≥$1B vol</b>"
+        body2 = f"Found {len(big_stocks)} stock(s) matching criteria:\n\n"
+        body2 += "<b>📈 Stocks (≥$1B vol)</b>\n"
+        body2 += _format_one_stock_block(big_stocks)
+        msg_big = _wrap_report(header2, body2.strip())
 
     # ---------- Message 3: Rising stars (250M–$1B vol) ----------
     rising_stocks = by_sector.get("Rising Stars", [])
     msg_rising = ""
     if rising_stocks:
-        msg_rising = time_header + "📊 <b>MarketScout (3/4) — Rising Stars</b>\n\n"
-        msg_rising += f"Found {len(rising_stocks)} rising star(s) matching criteria:\n\n"
-        msg_rising += "<b>⭐ Rising Stars (250M–$1B vol)</b>\n"
-        msg_rising += _format_one_stock_block(rising_stocks) + SECTION_END
+        header3 = time_header + "📊 <b>MarketScout (3/4) — Rising Stars</b>"
+        body3 = f"Found {len(rising_stocks)} rising star(s) matching criteria:\n\n"
+        body3 += "<b>⭐ Rising Stars (250M–$1B vol)</b>\n"
+        body3 += _format_one_stock_block(rising_stocks)
+        msg_rising = _wrap_report(header3, body3.strip())
 
     # ---------- Message 4: Crypto, Commodities, Forex, ETFs ----------
     msg_rest = ""
@@ -1276,7 +1282,8 @@ def format_stock_message(
                 msg_rest += "\n"
             msg_rest += "\n"
     if msg_rest.strip():
-        msg_rest = time_header + "📊 <b>MarketScout (4/4) — Crypto, Commodities, Forex, ETFs</b>\n\n" + msg_rest.strip() + SECTION_END
+        header4 = time_header + "📊 <b>MarketScout (4/4) — Crypto, Commodities, Forex, ETFs</b>"
+        msg_rest = _wrap_report(header4, msg_rest.strip())
 
     return (msg_indices.strip(), msg_big.strip(), msg_rising.strip(), msg_rest.strip())
 
