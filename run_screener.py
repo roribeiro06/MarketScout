@@ -281,8 +281,13 @@ def _get_next_delivery_target(config: dict):
     return next_target, next_index
 
 
+def _alpha_sort_key(item: dict) -> str:
+    """Sort key: alphabetical by symbol (case-insensitive). Use for all report ordering."""
+    return (item.get("symbol") or item.get("company_name") or item.get("name") or "").upper()
+
+
 def _pct_sort_key(item: dict) -> tuple:
-    """Sort key: largest move in any period that fit the criteria first (by magnitude)."""
+    """Sort key: largest move in any period that fit the criteria first (by magnitude). DEPRECATED: use _alpha_sort_key."""
     d = item.get("pct_4pm_to_8pm") if item.get("pct_4pm_to_8pm") is not None else item.get("one_day_pct")
     w = item.get("one_week_pct")
     m = item.get("one_month_pct")
@@ -529,7 +534,7 @@ def _append_section_block(
     stocks = by_sector.get(sector, [])
     if not stocks:
         return message
-    stocks = sorted(stocks, key=_pct_sort_key)
+    stocks = sorted(stocks, key=_alpha_sort_key)
     message += f"<b>{emoji} {sector}</b>\n"
     for stock in stocks:
         symbol = stock["symbol"]
@@ -577,7 +582,7 @@ def _format_one_stock_block(stocks: list, day_label: Optional[str] = None) -> st
     if not stocks:
         return ""
     lines = []
-    for stock in sorted(stocks, key=_pct_sort_key):
+    for stock in sorted(stocks, key=_alpha_sort_key):
         symbol = stock["symbol"]
         company_name = stock.get("company_name", symbol)
         sector_name = stock.get("display_sector") or stock.get("sector", "Other")
@@ -633,7 +638,7 @@ def format_deep_dive_message(
 
     # Brief pause before fetching financials (helps avoid Yahoo rate limit after stock scan)
     time.sleep(6.0)
-    for stock in sorted(qualifying, key=_pct_sort_key):
+    for stock in sorted(qualifying, key=_alpha_sort_key):
         symbol = stock["symbol"]
         company_name = stock.get("company_name", symbol)
         sector_name = stock.get("display_sector") or stock.get("sector", "Other")
@@ -736,7 +741,7 @@ def format_premarket_messages(
     if indices_data:
         header = time_header + "📊 <b>MarketScout — Post-market (1/2) Indices</b>"
         body = "<b>🌍 Indices</b>\n"
-        for idx in indices_data:
+        for idx in sorted(indices_data, key=lambda x: (x.get("symbol") or x.get("name") or "").upper()):
             name = idx["name"]
             symbol = idx["symbol"]
             price = idx["price"]
@@ -858,7 +863,7 @@ def _format_tracking_summary_4pm(
     time_header = ("🕐 " + (collection_time or "") + "\n\n" if collection_time else "")
     header = time_header + "📈 <b>MarketScout — Price Tracking (4pm vs yesterday 8pm)</b>"
     body = "Stocks in today's 4pm report that also appeared in yesterday's 8pm report:\n\n"
-    for s in sorted(stocks_with_pct, key=lambda x: -abs(float(x.get("pct_change_8pm_to_next_4pm", 0) or 0))):
+    for s in sorted(stocks_with_pct, key=lambda x: (x.get("symbol") or x.get("name") or "").upper()):
         sym = s.get("symbol", "")
         name = (s.get("name") or sym).replace(",", ";")
         p8 = s.get("price_8pm", "")
@@ -1080,20 +1085,6 @@ def format_earnings_message(
     today = datetime.now(ZoneInfo("America/New_York")).date()
     max_days_ahead = 30
 
-    def _earnings_sort_key(item):
-        stock, earnings_str = item
-        if not earnings_str:
-            return (1, 999999)  # no date last
-        try:
-            parts = earnings_str.split("-")
-            if len(parts) == 3:
-                ed = today.__class__(int(parts[0]), int(parts[1]), int(parts[2]))
-                days = (ed - today).days
-                return (0, days if 0 <= days <= max_days_ahead else 999998)
-        except (ValueError, IndexError):
-            pass
-        return (1, 999999)
-
     # Fetch earnings date once per stock; keep only upcoming within next 30 days
     stock_dates = []
     for stock in qualifying:
@@ -1113,7 +1104,7 @@ def format_earnings_message(
         time.sleep(1.0)
     if not stock_dates:
         return ""
-    stock_dates.sort(key=_earnings_sort_key)
+    stock_dates.sort(key=lambda item: (item[0].get("symbol") or item[0].get("company_name") or "").upper())
 
     for stock, earnings_date in stock_dates:
         symbol = stock["symbol"]
@@ -1159,7 +1150,7 @@ def format_stock_message(
     if indices_data:
         header1 = time_header + "📊 <b>MarketScout (1/4) — Indices</b>"
         body1 = "<b>🌍 Indices</b>\n\n"
-        for idx in indices_data:
+        for idx in sorted(indices_data, key=lambda x: (x.get("symbol") or x.get("name") or "").upper()):
             name = idx["name"]
             symbol = idx["symbol"]
             price = idx["price"]
@@ -1220,7 +1211,7 @@ def format_stock_message(
         for ac in etf_order:
             if ac not in by_asset_class:
                 continue
-            items = sorted(by_asset_class[ac], key=_pct_sort_key)
+            items = sorted(by_asset_class[ac], key=_alpha_sort_key)
             msg_rest += f"  <b>▸ {ac}</b>\n"
             for stock in items:
                 symbol = stock["symbol"]
@@ -1252,7 +1243,7 @@ def format_stock_message(
         for ac in sorted(by_asset_class.keys()):
             if ac in etf_order:
                 continue
-            items = sorted(by_asset_class[ac], key=_pct_sort_key)
+            items = sorted(by_asset_class[ac], key=_alpha_sort_key)
             msg_rest += f"  <b>▸ {ac}</b>\n"
             for stock in items:
                 symbol = stock["symbol"]
