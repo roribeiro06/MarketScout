@@ -1306,36 +1306,31 @@ def main() -> None:
         print("No delivery slot selected: current time is outside all delivery_times_et windows. Check config and run time (ET).", flush=True)
         return
     print(f"Report slot: {report_slot}", flush=True)
+    # Manual triggers: only one applies (first match wins so 8pm is not overwritten by 4pm when both env vars set)
     force_report_1 = (os.getenv("MARKETSCOUT_REPORT_1") or "").strip().lower() in ("1", "true", "yes")
-    if force_report_1:
-        delivery_slot_index = 0
-        report_slot = "8am"
-        next_delivery_target = None  # send immediately, no wait
-        print("MARKETSCOUT_REPORT_1=1: building 8am report and sending immediately.", flush=True)
-
-    # Manual trigger: send 8pm report right now (scan and send when done)
     force_report_8pm = (os.getenv("MARKETSCOUT_REPORT_8PM") or "").strip().lower() in ("1", "true", "yes")
+    force_report_5pm = (os.getenv("MARKETSCOUT_REPORT_5PM") or "").strip().lower() in ("1", "true", "yes")
+    force_report_4pm = (os.getenv("MARKETSCOUT_REPORT_4PM") or "").strip().lower() in ("1", "true", "yes")
     if force_report_8pm:
         delivery_slot_index = 4
         report_slot = "8pm"
-        next_delivery_target = None  # send when scan is done, no wait
-        print("MARKETSCOUT_REPORT_8PM=1: building 8pm report and sending when done.", flush=True)
-
-    # Manual trigger: send 5pm report right now (4pm→5pm post-market, send when done)
-    force_report_5pm = (os.getenv("MARKETSCOUT_REPORT_5PM") or "").strip().lower() in ("1", "true", "yes")
-    if force_report_5pm:
-        delivery_slot_index = 3
-        report_slot = "5pm"
-        next_delivery_target = None  # send when scan is done, no wait
-        print("MARKETSCOUT_REPORT_5PM=1: building 5pm report and sending when done.", flush=True)
-
-    # Manual trigger: send 4pm report right now (9:30→4pm, 2-of-3 criteria, full universe)
-    force_report_4pm = (os.getenv("MARKETSCOUT_REPORT_4PM") or "").strip().lower() in ("1", "true", "yes")
-    if force_report_4pm:
+        next_delivery_target = None
+        print("MARKETSCOUT_REPORT_8PM=1: building 8pm report (4pm->8pm post-market) and sending when done.", flush=True)
+    elif force_report_4pm:
         delivery_slot_index = 2
         report_slot = "4pm"
-        next_delivery_target = None  # send when scan is done, no wait
+        next_delivery_target = None
         print("MARKETSCOUT_REPORT_4PM=1: building 4pm report and sending when done.", flush=True)
+    elif force_report_5pm:
+        delivery_slot_index = 3
+        report_slot = "5pm"
+        next_delivery_target = None
+        print("MARKETSCOUT_REPORT_5PM=1: building 5pm report and sending when done.", flush=True)
+    elif force_report_1:
+        delivery_slot_index = 0
+        report_slot = "8am"
+        next_delivery_target = None
+        print("MARKETSCOUT_REPORT_1=1: building 8am report and sending immediately.", flush=True)
 
     # 12pm = tracking log only (no screener run)
     if report_slot == "12pm":
