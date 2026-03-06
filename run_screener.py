@@ -598,10 +598,14 @@ def _format_one_stock_block(stocks: list, day_label: Optional[str] = None) -> st
         vol_shares = vol / 1_000_000
         dollar_vol = (vol * price) / 1_000_000
         lead = "🟡 " if _all_three_pass(stock) else ""
-        d_str = _pct_str_no_pct("1D", stock["one_day_pct"], stock["passes_day"] if stock.get("pct_4pm_to_8pm") is None else False)
+        d_str = _pct_str_no_pct("1D", stock["one_day_pct"], stock["passes_day"] if stock.get("pct_4pm_to_8pm") is None and stock.get("pct_yesterday_4pm_to_8am") is None else False)
         pct_4pm = stock.get("pct_4pm_to_8pm")
+        pct_yest_8am = stock.get("pct_yesterday_4pm_to_8am")
         if pct_4pm is not None:
             pm_str = _pct_str_no_pct("4pm→8pm", pct_4pm, stock["passes_day"])
+            d_str = f"{d_str} | {pm_str}"
+        elif pct_yest_8am is not None:
+            pm_str = _pct_str_no_pct("Yest 4pm→8am", pct_yest_8am, stock["passes_day"])
             d_str = f"{d_str} | {pm_str}"
         w_str = _pct_str_no_pct("1W", stock["one_week_pct"], stock["passes_week"])
         m_val = stock.get("one_month_pct")
@@ -614,8 +618,11 @@ def _format_one_stock_block(stocks: list, day_label: Optional[str] = None) -> st
         change_str = f"{d_str} | {w_str} | {m_str} | {six_str} | {one_yr_str}"
         tp = stock.get("target_price")
         p4 = stock.get("regular_session_close")
+        yest4 = stock.get("yesterday_4pm_close")
         if pct_4pm is not None and p4 is not None:
             price_str = f"4pm: ${p4:.2f} → 8pm: ${price:.2f}" + (f" (1Y: ${tp:.2f})" if tp is not None else "")
+        elif pct_yest_8am is not None and yest4 is not None:
+            price_str = f"Yest 4pm: ${yest4:.2f} → 8am: ${price:.2f}" + (f" (1Y: ${tp:.2f})" if tp is not None else "")
         else:
             price_str = f"${price:.2f}" + (f" (1Y: ${tp:.2f})" if tp is not None else "")
         lines.append(f"{lead}<b>{html.escape(company_name)} ({symbol})</b> {price_str}")
@@ -1154,11 +1161,16 @@ def format_stock_message(
     )
     SECTION_EMOJI = {"Crypto": "🪙", "Commodities": "🌾", "Forex": "💵"}
     is_8pm = report_slot == "8pm"
+    is_8am = report_slot == "8am"
 
     # ---------- Message 1: Indices only ----------
     msg_indices = ""
     if indices_data:
-        header1 = time_header + ("📊 <b>MarketScout (1/4) — Indices (post-market)</b>" if is_8pm else "📊 <b>MarketScout (1/4) — Indices</b>")
+        header1 = time_header + (
+            "📊 <b>MarketScout (1/4) — Indices (post-market)</b>" if is_8pm
+            else "📊 <b>MarketScout (1/4) — Indices (pre-market)</b>" if is_8am
+            else "📊 <b>MarketScout (1/4) — Indices</b>"
+        )
         body1 = "<b>🌍 Indices</b>\n\n"
         for idx in sorted(indices_data, key=lambda x: (x.get("symbol") or x.get("name") or "").upper()):
             name = idx["name"]
@@ -1189,8 +1201,16 @@ def format_stock_message(
         big_stocks.extend(by_sector[s])
     msg_big = ""
     if big_stocks:
-        header2 = time_header + ("📊 <b>MarketScout (2/4) — Stocks ±3% from 4pm to 8pm (post-market)</b>" if is_8pm else "📊 <b>MarketScout (2/4) — Stocks ≥$1B vol</b>")
-        body2 = "Stocks with ±3% move from 4pm close to 8pm post-market (same volume criteria as 4pm):\n\n" if is_8pm else f"Found {len(big_stocks)} stock(s) matching criteria:\n\n"
+        header2 = time_header + (
+            "📊 <b>MarketScout (2/4) — Stocks ±3% from 4pm to 8pm (post-market)</b>" if is_8pm
+            else "📊 <b>MarketScout (2/4) — Stocks ±3% from yesterday 4pm to 8am (pre-market)</b>" if is_8am
+            else "📊 <b>MarketScout (2/4) — Stocks ≥$1B vol</b>"
+        )
+        body2 = (
+            "Stocks with ±3% move from 4pm close to 8pm post-market (same volume criteria as 4pm):\n\n" if is_8pm
+            else "Stocks with ±3% move from yesterday 4pm close to 8am pre-market (same volume criteria):\n\n" if is_8am
+            else f"Found {len(big_stocks)} stock(s) matching criteria:\n\n"
+        )
         body2 += "<b>📈 Stocks (≥$1B vol)</b>\n"
         body2 += _format_one_stock_block(big_stocks)
         msg_big = _wrap_report(header2, body2.strip())
@@ -1199,8 +1219,16 @@ def format_stock_message(
     rising_stocks = by_sector.get("Rising Stars", [])
     msg_rising = ""
     if rising_stocks:
-        header3 = time_header + ("📊 <b>MarketScout (3/4) — Rising stars ±3% from 4pm to 8pm (post-market)</b>" if is_8pm else "📊 <b>MarketScout (3/4) — Rising Stars</b>")
-        body3 = "Rising stars with ±3% move from 4pm close to 8pm post-market:\n\n" if is_8pm else f"Found {len(rising_stocks)} rising star(s) matching criteria:\n\n"
+        header3 = time_header + (
+            "📊 <b>MarketScout (3/4) — Rising stars ±3% from 4pm to 8pm (post-market)</b>" if is_8pm
+            else "📊 <b>MarketScout (3/4) — Rising stars ±3% from yesterday 4pm to 8am (pre-market)</b>" if is_8am
+            else "📊 <b>MarketScout (3/4) — Rising Stars</b>"
+        )
+        body3 = (
+            "Rising stars with ±3% move from 4pm close to 8pm post-market:\n\n" if is_8pm
+            else "Rising stars with ±3% move from yesterday 4pm close to 8am pre-market:\n\n" if is_8am
+            else f"Found {len(rising_stocks)} rising star(s) matching criteria:\n\n"
+        )
         body3 += "<b>⭐ Rising Stars (250M–$1B vol)</b>\n"
         body3 += _format_one_stock_block(rising_stocks)
         msg_rising = _wrap_report(header3, body3.strip())

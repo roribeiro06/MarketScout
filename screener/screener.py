@@ -261,6 +261,8 @@ def _evaluate_stock_data(
         # regular_session_close = today's 4pm close (before any pre/post-market overlay)
         regular_session_close = float(data["Close"].iloc[-1]) if len(data) > 0 else None
         regular_session_open = float(data["Open"].iloc[-1]) if len(data) > 0 and "Open" in data.columns else None
+        # For 8am: yesterday's 4pm close = most recent bar (at 8am the last bar is yesterday)
+        yesterday_4pm_close = float(data["Close"].iloc[-1]) if len(data) > 0 and report_slot == "8am" else None
 
         # 4pm report: open (9:30) → close (4pm) ±3%
         if report_slot == "4pm" and regular_session_open and regular_session_open > 0 and regular_session_close is not None:
@@ -282,9 +284,9 @@ def _evaluate_stock_data(
                         # 5pm: ±2%, 8pm: ±3%
                         threshold = 2.0 if report_slot == "5pm" else 3.0
                         passes_day = abs(pct_4pm_to_8pm) >= threshold
-                    elif report_slot == "8am" and prev_close and prev_close > 0:
-                        # 8am: pre-market 4am→8am ±3% (prev_close as proxy for 4am)
-                        one_day_change = ((current_price - prev_close) / prev_close) * 100
+                    elif report_slot == "8am" and yesterday_4pm_close and yesterday_4pm_close > 0:
+                        # 8am: yesterday's 4pm close → today's 8am pre-market ±3%
+                        one_day_change = ((current_price - yesterday_4pm_close) / yesterday_4pm_close) * 100
                         passes_day = abs(one_day_change) >= 3.0
                     elif prev_close and prev_close > 0:
                         one_day_change = ((current_price - prev_close) / prev_close) * 100
@@ -314,6 +316,9 @@ def _evaluate_stock_data(
             out["target_price"] = target_price
         if pct_4pm_to_8pm is not None:
             out["pct_4pm_to_8pm"] = round(pct_4pm_to_8pm, 2)
+        if report_slot == "8am" and yesterday_4pm_close is not None and live_price is not None:
+            out["yesterday_4pm_close"] = round(float(yesterday_4pm_close), 2)
+            out["pct_yesterday_4pm_to_8am"] = round(one_day_change, 2)
         # Slot reports: 8am/5pm/8pm = only slot move; 4pm = 2 of 3 (1D ±3%, 1W ±5%, 1M ±10%)
         if use_postmarket_prices or report_slot in ("5pm", "8pm", "8am"):
             if not passes_day:
