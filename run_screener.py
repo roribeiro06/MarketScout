@@ -755,7 +755,7 @@ def format_premarket_messages(
     if indices_data:
         header = time_header + "📊 <b>MarketScout — Post-market (1/2) Indices</b>"
         body = "<b>🌍 Indices</b>\n"
-        for idx in sorted(indices_data, key=lambda x: (x.get("symbol") or x.get("name") or "").upper()):
+        for idx in indices_data:
             name = idx["name"]
             symbol = idx["symbol"]
             price = idx["price"]
@@ -1172,7 +1172,7 @@ def format_stock_message(
             else "📊 <b>MarketScout (1/4) — Indices</b>"
         )
         body1 = "<b>🌍 Indices</b>\n\n"
-        for idx in sorted(indices_data, key=lambda x: (x.get("symbol") or x.get("name") or "").upper()):
+        for idx in indices_data:
             name = idx["name"]
             symbol = idx["symbol"]
             price = idx["price"]
