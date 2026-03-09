@@ -202,9 +202,10 @@ def _evaluate_stock_data(
         passes_volume = dollar_volume >= min_dv and dollar_volume <= max_dollar_volume
     else:
         passes_volume = dollar_volume > min_dv
-    passes_price = current_price >= thresholds.get("min_price", 0)  # Default to 0 if not specified
-    
-    # Stock passes if: volume AND price AND (1D or 1W or 1M, or post-market/4pm/5pm/8pm/8am slot)
+    # No minimum price filter: include all prices that meet volume and % move criteria
+    passes_price = True
+
+    # Stock passes if: volume AND (no price filter) AND (1D or 1W or 1M, or post-market/4pm/5pm/8pm/8am slot)
     slot_ok = report_slot in ("8am", "4pm", "5pm", "8pm")
     if passes_volume and passes_price and (passes_day or passes_week or passes_month or use_postmarket_prices or slot_ok):
         

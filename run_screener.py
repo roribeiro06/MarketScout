@@ -1336,6 +1336,7 @@ def main() -> None:
     print(f"Report slot: {report_slot}", flush=True)
     # Manual triggers: only one applies (first match wins so 8pm is not overwritten by 4pm when both env vars set)
     force_report_1 = (os.getenv("MARKETSCOUT_REPORT_1") or "").strip().lower() in ("1", "true", "yes")
+    force_report_12pm = (os.getenv("MARKETSCOUT_REPORT_12PM") or "").strip().lower() in ("1", "true", "yes")
     force_report_8pm = (os.getenv("MARKETSCOUT_REPORT_8PM") or "").strip().lower() in ("1", "true", "yes")
     force_report_5pm = (os.getenv("MARKETSCOUT_REPORT_5PM") or "").strip().lower() in ("1", "true", "yes")
     force_report_4pm = (os.getenv("MARKETSCOUT_REPORT_4PM") or "").strip().lower() in ("1", "true", "yes")
@@ -1359,6 +1360,11 @@ def main() -> None:
         report_slot = "8am"
         next_delivery_target = None
         print("MARKETSCOUT_REPORT_1=1: building 8am report and sending immediately.", flush=True)
+    elif force_report_12pm:
+        delivery_slot_index = 1
+        report_slot = "12pm"
+        next_delivery_target = None
+        print("MARKETSCOUT_REPORT_12PM=1: building 12pm tracking report and sending.", flush=True)
 
     # 12pm = tracking log only (no screener run)
     if report_slot == "12pm":
