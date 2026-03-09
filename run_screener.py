@@ -1023,8 +1023,8 @@ def _run_12pm_tracking_report(config: dict) -> None:
         name = next((r[2] for r in rows_4pm if r[1] == sym), sym)
         cur = prices.get(sym)
         cur_str = f"${cur:.2f}" if cur is not None else "—"
-        log_str = "; ".join(f"{d} ({pct}%)" for d, pct in by_sym_4pm[sym])
-        body1 += f"<b>{html.escape(name)} ({sym})</b> now {cur_str}\n  Log: {log_str}\n\n"
+        log_lines = "\n    ".join(f"{d} ({pct}%)" for d, pct in by_sym_4pm[sym])
+        body1 += f"<b>{html.escape(name)} ({sym})</b> now {cur_str}\n  Log:\n    {log_lines}\n\n"
     msg_part1 = _wrap_report(header1, body1.strip())
 
     header2 = time_header + "📋 <b>MarketScout — 12pm Tracking (Part 2: 8am/5pm/8pm, 3 days)</b>"
@@ -1034,8 +1034,8 @@ def _run_12pm_tracking_report(config: dict) -> None:
         name = next((r[2] for r in rows_short if r[1] == sym), sym)
         cur = prices.get(sym)
         cur_str = f"${cur:.2f}" if cur is not None else "—"
-        log_str = "; ".join(f"{d} {rpt} ({pct}%)" for d, rpt, pct in entries)
-        body2 += f"<b>{html.escape(name)} ({sym})</b> now {cur_str}\n  Log: {log_str}\n\n"
+        log_lines = "\n    ".join(f"{d} {rpt} ({pct}%)" for d, rpt, pct in entries)
+        body2 += f"<b>{html.escape(name)} ({sym})</b> now {cur_str}\n  Log:\n    {log_lines}\n\n"
     msg_part2 = _wrap_report(header2, body2.strip())
 
     token = (os.getenv("TELEGRAM_BOT_TOKEN") or "").strip()
