@@ -1,21 +1,12 @@
-name: MarketScout Telegram notifications
+name: MarketScout
 
 on:
   workflow_dispatch:
   schedule:
-    # 8am: start at 7:30am ET, send at 8:00am (script waits until 08:00 ET).
-    # 12pm: start at 11:50am ET, send at 12:00pm.
-    # 4pm: start at 4:00pm ET, send when scan is done (regular 9:30→4pm report).
-    # 5pm: start at 4:40pm ET, send at 5:00pm (4pm→5pm post-market).
-    # 8:30pm: start at 8:00pm ET, send when scan is done (4pm→8pm post-market; typically lands ~8:30pm).
-    - cron: "30 11 * * *"  # 7:30am EDT → 8:00 AM ET (pre-market)
-    - cron: "50 15 * * *"  # 11:50am EDT → 12:00 PM ET (tracking log)
-    - cron: "0 20 * * *"   # 4:00pm EDT → 4pm report (scan at 4pm, send when done)
-    - cron: "40 20 * * *"  # 4:40pm EDT → 5:00 PM ET (4pm→5pm post-market; scan at 4:40)
-    - cron: "0 0 * * *"    # midnight UTC = 8:00 PM ET (4pm→8pm; scan at 8pm, send when done)
+    - cron: "0 20 * * *"   # 4:00pm ET -> daily scan + send report
 
 jobs:
-  run-screener:
+  run:
     runs-on: ubuntu-latest
     timeout-minutes: 180
 
@@ -24,36 +15,27 @@ jobs:
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+        run: pip install -r requirements.txt
 
       - name: Check Telegram secrets
         run: |
           if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
-            echo "::error::TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID must be set in repo Secrets (Settings → Secrets and variables → Actions)."
+            echo "::error::Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in repo Secrets."
             exit 1
           fi
-          echo "Secrets are set (chat_id length: ${#TELEGRAM_CHAT_ID})."
 
-      - name: Test Telegram bot token
+      - name: Run momentum (4pm report or manual)
         run: |
-          resp=$(curl -s -o /dev/null -w "%{http_code}" "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getMe")
-          if [ "$resp" != "200" ]; then
-            echo "::error::Bot token invalid or revoked (HTTP $resp). Check TELEGRAM_BOT_TOKEN in repo Secrets."
-            exit 1
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            python momentum_logger.py --mode daily
+            python momentum_logger.py --mode noon
+          else
+            python momentum_logger.py --mode daily
           fi
-          echo "Bot token is valid."
-
-      - name: Run full MarketScout screener (indices, stocks, crypto, commodities, forex + charts)
-        run: python run_screener.py
-
