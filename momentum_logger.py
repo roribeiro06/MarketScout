@@ -141,30 +141,12 @@ def _evaluate_symbol(symbol: str, as_of: Optional[datetime] = None) -> Optional[
         return None
 
 
-def _load_universe(config: Dict, quick_sample: bool = False) -> List[str]:
+def _load_universe(config: Dict) -> List[str]:
     exchanges = config.get("exchanges", ["NYSE", "NASDAQ"])
     symbols: List[str] = []
     for ex in exchanges:
         symbols.extend(get_exchange_symbols(ex))
     symbols = list(dict.fromkeys(symbols))
-
-    if quick_sample:
-        # Small fixed sample for manual testing
-        sample = [
-            "AAPL",
-            "MSFT",
-            "NVDA",
-            "AMZN",
-            "META",
-            "TSLA",
-            "ABNB",
-            "COP",
-            "DVN",
-            "DOCN",
-        ]
-        print(f"MOMENTUM_QUICK_SAMPLE=1: using {len(sample)} symbols")
-        return sample
-
     print(f"Universe size: {len(symbols)} symbols")
     return symbols
 
@@ -461,8 +443,7 @@ def run_daily_scan(as_of: Optional[datetime] = None) -> None:
     then send Rising Stars and Big Ones reports.
     """
     config = load_config("config.yaml")
-    quick = (os.getenv("MOMENTUM_QUICK_SAMPLE") or "").strip().lower() in ("1", "true", "yes")
-    universe = _load_universe(config, quick_sample=quick)
+    universe = _load_universe(config)
 
     now_et = as_of or datetime.now(ZoneInfo("America/New_York"))
     print(
@@ -503,8 +484,7 @@ def run_backtest(start_date: str = "2026-01-01") -> None:
     This does NOT send reports; it only populates the log.
     """
     config = load_config("config.yaml")
-    quick = (os.getenv("MOMENTUM_QUICK_SAMPLE") or "").strip().lower() in ("1", "true", "yes")
-    universe = _load_universe(config, quick_sample=quick)
+    universe = _load_universe(config)
 
     start_d = datetime.strptime(start_date, "%Y-%m-%d").date()
     today_d = datetime.now(ZoneInfo("America/New_York")).date()
