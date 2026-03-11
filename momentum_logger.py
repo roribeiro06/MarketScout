@@ -1,26 +1,51 @@
 """
-Momentum logger: scan stocks with 3-of-4 criteria (1D>=3%, 7D>=5%, 30D>=15%, 90D>=30%),
-all same sign (all positive or all negative). Log to CSV, keep 6 months. Daily at 4pm: send via Telegram.
+Momentum logger:
+- Universe: all NYSE + NASDAQ common stocks
+- Criteria: 3-of-4 thresholds in the SAME direction (all positive or all negative):
+    * 1D >= 3%, 7D >= 5%, 30D >= 15%, 90D >= 30%
+    * or 1D <= -3%, 7D <= -5%, 30D <= -15%, 90D <= -30%
+- Volume filter: daily dollar volume >= $250M
+- Log: CSV (6 months retention) with:
+    symbol, name, sector, timestamp, price, 1y target, daily dollar volume,
+    pct_1d, pct_7d, pct_30d, pct_90d, pct_1y, pct_3y
+
+Daily run (4pm ET via GitHub Actions):
+- Scan universe, append matches to log (prune >6 months)
+- Build two HTML reports and send to Telegram:
+    * Rising Stars: today's daily volume >= $250M and < $1B
+    * Big Ones: today's daily volume >= $1B
+
+Backtest (manual, one-time as desired):
+- python momentum_logger.py --mode backtest --start 2026-01-01
+- Populates the same CSV using end-of-day data for each day.
 """
+
 import csv
 import os
 import tempfile
 import time
 from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
+
+from zoneinfo import ZoneInfo
 
 import requests
 import yfinance as yf
 
 from screener.screener import get_exchange_symbols, load_config
 
+
 LOG_DIR = Path("logs")
 LOG_PATH = LOG_DIR / "momentum_log.csv"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
+# Thresholds for move criteria
 THRESHOLDS = {"d1": 3.0, "d7": 5.0, "d30": 15.0, "d90": 30.0}
+
+# Volume thresholds (dollar volume = price * volume)
+MIN_DOLLAR_VOLUME = 250_000_000  # >= $250M
+BIG_STOCK_DOLLAR_VOLUME = 1_000_000_000  # >= $1B
 
 
 def _pct_change(series, days: int) -> Optional[float]:
@@ -34,6 +59,10 @@ def _pct_change(series, days: int) -> Optional[float]:
 
 
 def _evaluate_symbol(symbol: str, as_of: Optional[datetime] = None) -> Optional[Dict]:
+    """
+    Evaluate a symbol as of a given datetime (ET). Uses daily bars from yfinance.
+    Returns a dict with all logged fields if it passes filters, else None.
+    """
     try:
         t = yf.Ticker(symbol)
         hist = t.history(period="max", auto_adjust=False, interval="1d")
@@ -41,14 +70,16 @@ def _evaluate_symbol(symbol: str, as_of: Optional[datetime] = None) -> Optional[
             return None
 
         close = hist["Close"]
+        volume = hist["Volume"]
+
+        # Restrict history up to as_of if provided
         if as_of is not None:
-            # yfinance index is tz-aware; make as_of match
-            tz = close.index.tz if hasattr(close.index, "tz") and close.index.tz else ZoneInfo("America/New_York")
-            if as_of.tzinfo is None:
-                as_of_aware = as_of.replace(tzinfo=tz)
-            else:
-                as_of_aware = as_of
+            idx = close.index
+            tz = idx.tz if hasattr(idx, "tz") and idx.tz else ZoneInfo("America/New_York")
+            as_of_aware = as_of if as_of.tzinfo is not None else as_of.replace(tzinfo=tz)
             close = close[close.index <= as_of_aware]
+            volume = volume[volume.index <= as_of_aware]
+
         if len(close) < 252:
             return None
 
@@ -62,19 +93,35 @@ def _evaluate_symbol(symbol: str, as_of: Optional[datetime] = None) -> Optional[
         if any(x is None for x in (d1, d7, d30, d90)):
             return None
 
-        pos = [d1 >= THRESHOLDS["d1"], d7 >= THRESHOLDS["d7"], d30 >= THRESHOLDS["d30"], d90 >= THRESHOLDS["d90"]]
-        neg = [d1 <= -THRESHOLDS["d1"], d7 <= -THRESHOLDS["d7"], d30 <= -THRESHOLDS["d30"], d90 <= -THRESHOLDS["d90"]]
+        # 3-of-4 in same direction (all positive or all negative)
+        pos = [
+            d1 >= THRESHOLDS["d1"],
+            d7 >= THRESHOLDS["d7"],
+            d30 >= THRESHOLDS["d30"],
+            d90 >= THRESHOLDS["d90"],
+        ]
+        neg = [
+            d1 <= -THRESHOLDS["d1"],
+            d7 <= -THRESHOLDS["d7"],
+            d30 <= -THRESHOLDS["d30"],
+            d90 <= -THRESHOLDS["d90"],
+        ]
         if sum(pos) < 3 and sum(neg) < 3:
             return None
 
-        info = t.info or {}
         last_price = float(close.iloc[-1])
+        last_volume = float(volume.iloc[-1])
+        dollar_volume = last_price * last_volume
+        if dollar_volume < MIN_DOLLAR_VOLUME:
+            return None
+
+        info = t.info or {}
         name = info.get("longName") or info.get("shortName") or symbol
         sector = info.get("sector") or "Other"
         target = info.get("targetMeanPrice")
         target = round(float(target), 2) if isinstance(target, (int, float)) else None
 
-        ts = as_of or datetime.now()
+        ts = as_of or datetime.now(ZoneInfo("America/New_York"))
         return {
             "timestamp": ts.strftime("%Y-%m-%d %H:%M:%S"),
             "symbol": symbol,
@@ -82,6 +129,7 @@ def _evaluate_symbol(symbol: str, as_of: Optional[datetime] = None) -> Optional[
             "sector": sector,
             "price": f"{last_price:.2f}",
             "target_1y": f"{target:.2f}" if target is not None else "",
+            "dollar_volume": f"{dollar_volume:.2f}",
             "pct_1d": f"{d1:.2f}",
             "pct_7d": f"{d7:.2f}",
             "pct_30d": f"{d30:.2f}",
@@ -93,26 +141,32 @@ def _evaluate_symbol(symbol: str, as_of: Optional[datetime] = None) -> Optional[
         return None
 
 
-# Curated liquid symbols for quick sample (avoid warrants/delisted at start of exchange lists)
-QUICK_SAMPLE_SYMBOLS = [
-    "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "BRK-B", "UNH", "JNJ",
-    "JPM", "V", "PG", "MA", "HD", "DIS", "BAC", "ADBE", "CRM", "XOM", "CVX", "KO",
-    "PEP", "COST", "WMT", "MCD", "ABT", "NEE", "TMO", "AVGO", "ACN", "DHR", "NKE",
-    "PM", "BMY", "TXN", "HON", "ORCL", "UPS", "LOW", "AMD", "INTC", "IBM", "GE",
-    "CAT", "DE", "GS", "MS", "AXP", "BA", "UNP", "RTX", "LMT", "SBUX", "MDT",
-    "GILD", "AMGN", "VZ", "T", "CMCSA", "PYPL", "ISRG", "REGN", "PLD", "LRCX",
-    "BKNG", "ADI", "SNPS", "CDNS", "KLAC", "AMAT", "PANW", "ABNB", "MRVL",
-]
-
 def _load_universe(config: Dict, quick_sample: bool = False) -> List[str]:
-    if quick_sample:
-        print(f"  MOMENTUM_QUICK_SAMPLE: using {len(QUICK_SAMPLE_SYMBOLS)} liquid symbols")
-        return list(QUICK_SAMPLE_SYMBOLS)
     exchanges = config.get("exchanges", ["NYSE", "NASDAQ"])
-    symbols = []
+    symbols: List[str] = []
     for ex in exchanges:
         symbols.extend(get_exchange_symbols(ex))
-    return list(dict.fromkeys(symbols))
+    symbols = list(dict.fromkeys(symbols))
+
+    if quick_sample:
+        # Small fixed sample for manual testing
+        sample = [
+            "AAPL",
+            "MSFT",
+            "NVDA",
+            "AMZN",
+            "META",
+            "TSLA",
+            "ABNB",
+            "COP",
+            "DVN",
+            "DOCN",
+        ]
+        print(f"MOMENTUM_QUICK_SAMPLE=1: using {len(sample)} symbols")
+        return sample
+
+    print(f"Universe size: {len(symbols)} symbols")
+    return symbols
 
 
 def _read_rows() -> List[Dict]:
@@ -124,8 +178,19 @@ def _read_rows() -> List[Dict]:
 
 def _write_rows(rows: List[Dict]) -> None:
     fieldnames = [
-        "timestamp", "symbol", "name", "sector", "price", "target_1y",
-        "pct_1d", "pct_7d", "pct_30d", "pct_90d", "pct_1y", "pct_3y",
+        "timestamp",
+        "symbol",
+        "name",
+        "sector",
+        "price",
+        "target_1y",
+        "dollar_volume",
+        "pct_1d",
+        "pct_7d",
+        "pct_30d",
+        "pct_90d",
+        "pct_1y",
+        "pct_3y",
     ]
     with open(LOG_PATH, "w", encoding="utf-8", newline="") as f:
         w = csv.DictWriter(f, fieldnames=fieldnames)
@@ -135,244 +200,360 @@ def _write_rows(rows: List[Dict]) -> None:
 
 
 def _prune_six_months(rows: List[Dict]) -> List[Dict]:
-    cutoff = datetime.now() - timedelta(days=180)
-    kept = []
+    cutoff = datetime.now(ZoneInfo("America/New_York")) - timedelta(days=180)
+    kept: List[Dict] = []
     for r in rows:
         try:
             ts = datetime.strptime(r["timestamp"], "%Y-%m-%d %H:%M:%S")
         except Exception:
             continue
-        if ts >= cutoff:
+        if ts >= cutoff.replace(tzinfo=None):
             kept.append(r)
     return kept
 
 
-def _build_noon_csv(rows: List[Dict]) -> str:
-    """Build CSV: Line 1 blank. Per stock (sorted by name): header line, then log lines."""
-    if not rows:
-        return "\n"
+def _classify_row_direction(row: Dict) -> str:
+    """
+    Return "pos", "neg", or "mixed" based on 3-of-4 same-direction rule for that row.
+    """
+    try:
+        d1 = float(row.get("pct_1d") or 0.0)
+        d7 = float(row.get("pct_7d") or 0.0)
+        d30 = float(row.get("pct_30d") or 0.0)
+        d90 = float(row.get("pct_90d") or 0.0)
+    except ValueError:
+        return "mixed"
 
-    by_symbol: Dict[str, List[Dict]] = {}
-    for r in rows:
-        sym = r.get("symbol", "")
-        by_symbol.setdefault(sym, []).append(r)
-
-    def sort_key(sym: str) -> str:
-        return (by_symbol[sym][0].get("name") or sym).upper()
-
-    lines = [""]
-    for symbol in sorted(by_symbol.keys(), key=sort_key):
-        entries = by_symbol[symbol]
-        name = entries[0].get("name", symbol)
-        sector = entries[0].get("sector", "")
-
-        try:
-            t = yf.Ticker(symbol)
-            info = t.info or {}
-            price_now = info.get("regularMarketPrice") or info.get("previousClose") or entries[-1].get("price", "")
-            target_now = info.get("targetMeanPrice")
-            price_now = f"{float(price_now):.2f}" if isinstance(price_now, (int, float)) else str(price_now or "")
-            target_now = f"{float(target_now):.2f}" if isinstance(target_now, (int, float)) else ""
-        except Exception:
-            price_now = entries[-1].get("price", "")
-            target_now = entries[-1].get("target_1y", "")
-
-        lines.append(f"{name}, ({symbol}), {sector}, {price_now}, {target_now}")
-        for e in entries:
-            ts = e.get("timestamp", "")
-            price = e.get("price", "")
-            target = e.get("target_1y", "")
-            p1, p7, p30, p90, p1y = e.get("pct_1d", ""), e.get("pct_7d", ""), e.get("pct_30d", ""), e.get("pct_90d", ""), e.get("pct_1y", "")
-            lines.append(f"{ts}, {price}, ({target}), {p1}, {p7}, {p30}, {p90}, {p1y}")
-        time.sleep(0.1)
-
-    return "\n".join(lines) + "\n"
+    pos = [
+        d1 >= THRESHOLDS["d1"],
+        d7 >= THRESHOLDS["d7"],
+        d30 >= THRESHOLDS["d30"],
+        d90 >= THRESHOLDS["d90"],
+    ]
+    neg = [
+        d1 <= -THRESHOLDS["d1"],
+        d7 <= -THRESHOLDS["d7"],
+        d30 <= -THRESHOLDS["d30"],
+        d90 <= -THRESHOLDS["d90"],
+    ]
+    if sum(pos) >= 3:
+        return "pos"
+    if sum(neg) >= 3:
+        return "neg"
+    return "mixed"
 
 
-def _build_noon_html(rows: List[Dict]) -> str:
-    """Build HTML report: white background, black font. Works when empty too."""
-    style = "background-color: white; color: black; font-family: sans-serif; padding: 1em;"
+def _build_group_html(
+    title: str,
+    rows: List[Dict],
+    today_dollar_volume_by_symbol: Dict[str, float],
+) -> str:
+    """
+    Build HTML report:
+    - Line 1: blank (simulated as leading <br>)
+    - Per stock (sorted by name):
+        Line 2-like: Name, (Ticker), Sector, price_now, (target_now), daily dollar volume today
+        Subsequent lines: timestamp, price, (target_1y), daily_dollar_volume_at_ts,
+                          %1D, %7D, %30D, %90D, %1Y
+                          row text green if >=3 positive criteria, red if >=3 negative.
+    """
+    style_body = "background-color: white; color: black; font-family: Arial, sans-serif; padding: 1em;"
+
     if not rows:
         return f"""<!DOCTYPE html>
 <html>
-<head><meta charset="utf-8"><title>Momentum Log</title></head>
-<body style="{style}">
-<h2 style="color: black;">MarketScout Momentum Log</h2>
-<p style="color: black;">No data in the last 6 months. Run a daily scan or backtest to populate the log.</p>
-<p style="color: black;">Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}</p>
-</body>
-</html>"""
+<head><meta charset="utf-8"><title>{title}</title></head>
+<body style="{style_body}">
+<br>
+<h2>{title}</h2>
+<p>No matches in the last 6 months.</p>
+</body></html>
+"""
 
+    # Group by symbol
     by_symbol: Dict[str, List[Dict]] = {}
     for r in rows:
         sym = r.get("symbol", "")
         by_symbol.setdefault(sym, []).append(r)
 
     def sort_key(sym: str) -> str:
-        return (by_symbol[sym][0].get("name") or sym).upper()
+        first = by_symbol[sym][0]
+        return (first.get("name") or sym).upper()
 
-    html_parts = [f'<html><head><meta charset="utf-8"><title>Momentum Log</title></head><body style="{style}">']
-    html_parts.append(f'<h2 style="color: black;">MarketScout Momentum Log</h2>')
-    html_parts.append(f'<p style="color: black;">Generated: {datetime.now().strftime("%Y-%m-%d %H:%M")}</p>')
+    parts: List[str] = [
+        "<!DOCTYPE html>",
+        '<html><head><meta charset="utf-8">',
+        f"<title>{title}</title>",
+        "</head>",
+        f'<body style="{style_body}">',
+        "<br>",
+        f"<h2>{title}</h2>",
+    ]
 
     for symbol in sorted(by_symbol.keys(), key=sort_key):
         entries = by_symbol[symbol]
-        name = entries[0].get("name", symbol)
-        sector = entries[0].get("sector", "")
+        first = entries[0]
+        name = first.get("name", symbol)
+        sector = first.get("sector", "")
+
+        # Current price/target and today's dollar volume (if available)
+        price_now = ""
+        target_now = ""
+        dv_today = today_dollar_volume_by_symbol.get(symbol)
 
         try:
             t = yf.Ticker(symbol)
             info = t.info or {}
-            price_now = info.get("regularMarketPrice") or info.get("previousClose") or entries[-1].get("price", "")
-            target_now = info.get("targetMeanPrice")
-            price_now = f"{float(price_now):.2f}" if isinstance(price_now, (int, float)) else str(price_now or "")
-            target_now = f"{float(target_now):.2f}" if isinstance(target_now, (int, float)) else ""
+            p = info.get("regularMarketPrice") or info.get("previousClose")
+            if isinstance(p, (int, float)):
+                price_now = f"{float(p):.2f}"
+            target = info.get("targetMeanPrice")
+            if isinstance(target, (int, float)):
+                target_now = f"{float(target):.2f}"
         except Exception:
-            price_now = entries[-1].get("price", "")
-            target_now = entries[-1].get("target_1y", "")
+            # fall back to last logged values
+            last = entries[-1]
+            price_now = last.get("price", "")
+            target_now = last.get("target_1y", "")
 
-        html_parts.append(f'<h3 style="color: black; margin-top: 1.5em;">{name}, ({symbol}), {sector}, {price_now}, {target_now}</h3>')
-        html_parts.append('<table border="1" cellpadding="6" cellspacing="0" style="border-color: black; color: black; background: white;">')
-        html_parts.append("<tr><th>Timestamp</th><th>Price</th><th>Target</th><th>%1D</th><th>%7D</th><th>%30D</th><th>%90D</th><th>%1Y</th></tr>")
+        dv_today_str = f"{dv_today:,.0f}" if isinstance(dv_today, (int, float, float)) else ""
+
+        parts.append(
+            f"<h3>{name}, ({symbol}), {sector}, {price_now}, ({target_now}), {dv_today_str}</h3>"
+        )
+
+        # Table of logged rows
+        parts.append(
+            '<table border="1" cellpadding="4" cellspacing="0" '
+            'style="border-collapse: collapse; border-color: #ccc; font-size: 13px;">'
+        )
+        parts.append(
+            "<tr>"
+            "<th>Timestamp</th>"
+            "<th>Price</th>"
+            "<th>Target 1Y</th>"
+            "<th>Daily $ Volume</th>"
+            "<th>%1D</th>"
+            "<th>%7D</th>"
+            "<th>%30D</th>"
+            "<th>%90D</th>"
+            "<th>%1Y</th>"
+            "</tr>"
+        )
+
         for e in entries:
+            direction = _classify_row_direction(e)
+            color = "green" if direction == "pos" else "red" if direction == "neg" else "black"
             ts = e.get("timestamp", "")
             price = e.get("price", "")
-            target = e.get("target_1y", "")
-            p1, p7, p30, p90, p1y = e.get("pct_1d", ""), e.get("pct_7d", ""), e.get("pct_30d", ""), e.get("pct_90d", ""), e.get("pct_1y", "")
-            html_parts.append(f"<tr><td>{ts}</td><td>{price}</td><td>{target}</td><td>{p1}</td><td>{p7}</td><td>{p30}</td><td>{p90}</td><td>{p1y}</td></tr>")
-        html_parts.append("</table>")
-        time.sleep(0.1)
+            target_1y = e.get("target_1y", "")
+            dv = e.get("dollar_volume", "")
+            p1 = e.get("pct_1d", "")
+            p7 = e.get("pct_7d", "")
+            p30 = e.get("pct_30d", "")
+            p90 = e.get("pct_90d", "")
+            p1y = e.get("pct_1y", "")
+            parts.append(
+                f'<tr style="color: {color};">'
+                f"<td>{ts}</td>"
+                f"<td>{price}</td>"
+                f"<td>{target_1y}</td>"
+                f"<td>{dv}</td>"
+                f"<td>{p1}</td>"
+                f"<td>{p7}</td>"
+                f"<td>{p30}</td>"
+                f"<td>{p90}</td>"
+                f"<td>{p1y}</td>"
+                "</tr>"
+            )
+        parts.append("</table>")
+        parts.append("<br>")
 
-    html_parts.append("</body></html>")
-    return "\n".join(html_parts)
+    parts.append("</body></html>")
+    return "\n".join(parts)
 
 
-def _send_telegram_document(content: str, filename: str, mime_type: str, caption: str = "") -> bool:
-    """Send file via Telegram sendDocument."""
+def _send_telegram_document(content: str, filename: str, mime_type: str, caption: str) -> bool:
     token = (os.getenv("TELEGRAM_BOT_TOKEN") or "").strip()
     chat_id = (os.getenv("TELEGRAM_CHAT_ID") or "").strip()
     if not token or not chat_id:
-        print("TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID required to send.")
+        print("TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID must be set to send Telegram reports.")
         return False
 
-    ext = ".html" if "html" in mime_type else ".csv"
+    suffix = ".html" if "html" in mime_type else ".csv"
     try:
-        with tempfile.NamedTemporaryFile(mode="w", suffix=ext, delete=False, encoding="utf-8") as f:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=suffix, delete=False, encoding="utf-8"
+        ) as f:
             f.write(content)
             tmp_path = f.name
         try:
             url = f"https://api.telegram.org/bot{token}/sendDocument"
             with open(tmp_path, "rb") as doc:
                 files = {"document": (filename, doc, mime_type)}
-                data = {"chat_id": chat_id, "caption": caption or f"MarketScout — {datetime.now().strftime('%Y-%m-%d %H:%M')}"}
-                r = requests.post(url, data=data, files=files, timeout=30)
+                data = {"chat_id": chat_id, "caption": caption}
+                r = requests.post(url, data=data, files=files, timeout=60)
             if r.status_code != 200:
                 print(f"Telegram error {r.status_code}: {r.text[:300]}")
                 return False
-            print("Report sent via Telegram.")
+            print(f"Telegram document sent: {filename}")
             return True
         finally:
             os.unlink(tmp_path)
     except Exception as e:
-        print(f"Failed to send: {e}")
+        print(f"Failed to send Telegram document: {e}")
         return False
 
 
+def _build_and_send_reports(today_matches: List[Dict]) -> None:
+    """
+    Build Rising Stars / Big Ones HTML reports from the full log, filtered by today's dollar volume.
+    """
+    if not today_matches:
+        print("No matches today; sending empty reports.")
+
+    # Map symbol -> today's dollar volume
+    today_dollar_volumes: Dict[str, float] = {}
+    for m in today_matches:
+        sym = m.get("symbol", "")
+        try:
+            dv = float(m.get("dollar_volume") or 0.0)
+        except ValueError:
+            dv = 0.0
+        today_dollar_volumes[sym] = dv
+
+    all_rows = _read_rows()
+    all_rows = _prune_six_months(all_rows)
+
+    # Partition symbols into Rising Stars and Big Ones based on today's volume
+    rising_syms = {
+        s
+        for s, dv in today_dollar_volumes.items()
+        if MIN_DOLLAR_VOLUME <= dv < BIG_STOCK_DOLLAR_VOLUME
+    }
+    big_syms = {s for s, dv in today_dollar_volumes.items() if dv >= BIG_STOCK_DOLLAR_VOLUME}
+
+    rising_rows = [r for r in all_rows if r.get("symbol") in rising_syms]
+    big_rows = [r for r in all_rows if r.get("symbol") in big_syms]
+
+    # Build HTML
+    rising_html = _build_group_html("Rising Stars", rising_rows, today_dollar_volumes)
+    big_html = _build_group_html("Big Ones", big_rows, today_dollar_volumes)
+
+    today_str = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
+    _send_telegram_document(
+        rising_html,
+        f"rising_stars_{today_str}.html",
+        "text/html",
+        caption=f"Rising Stars — {today_str}",
+    )
+    _send_telegram_document(
+        big_html,
+        f"big_ones_{today_str}.html",
+        "text/html",
+        caption=f"Big Ones — {today_str}",
+    )
+
+
 def run_daily_scan(as_of: Optional[datetime] = None) -> None:
-    """Scan universe, append matches, prune to 6 months."""
+    """
+    Scan universe as of as_of (defaults to now ET), log matches, prune to 6 months,
+    then send Rising Stars and Big Ones reports.
+    """
     config = load_config("config.yaml")
     quick = (os.getenv("MOMENTUM_QUICK_SAMPLE") or "").strip().lower() in ("1", "true", "yes")
     universe = _load_universe(config, quick_sample=quick)
-    print(f"Scanning {len(universe)} symbols for 3-of-4 criteria (all positive or all negative)...")
+
+    now_et = as_of or datetime.now(ZoneInfo("America/New_York"))
+    print(
+        f"Scanning {len(universe)} symbols for 3-of-4 criteria (all positive or all negative) "
+        f"as of {now_et.strftime('%Y-%m-%d %H:%M:%S %Z')}..."
+    )
 
     existing = _read_rows()
-    new_rows = []
-    now = as_of or datetime.now()
+    today_matches: List[Dict] = []
+
     for i, sym in enumerate(universe):
-        rec = _evaluate_symbol(sym, as_of=now)
+        rec = _evaluate_symbol(sym, as_of=now_et)
         if rec:
-            new_rows.append(rec)
-            print(f"  [MATCH] {sym}: 1D {rec['pct_1d']}%, 7D {rec['pct_7d']}%, 30D {rec['pct_30d']}%, 90D {rec['pct_90d']}%")
+            today_matches.append(rec)
+            print(
+                f"  [MATCH] {sym}: 1D {rec['pct_1d']}%, 7D {rec['pct_7d']}%, "
+                f"30D {rec['pct_30d']}%, 90D {rec['pct_90d']}%, "
+                f"DV ${float(rec['dollar_volume']):,.0f}"
+            )
         if (i + 1) % 100 == 0:
             print(f"  Progress: {i + 1}/{len(universe)}", flush=True)
-        time.sleep(0.1)
+        time.sleep(0.05)
 
-    all_rows = existing + new_rows
+    all_rows = existing + today_matches
     all_rows = _prune_six_months(all_rows)
     _write_rows(all_rows)
-    print(f"Appended {len(new_rows)}. Total (<=6mo): {len(all_rows)}. Log: {LOG_PATH}")
+    print(
+        f"Appended {len(today_matches)} rows. Total (<=6 months): {len(all_rows)}. "
+        f"Log: {LOG_PATH.resolve()}"
+    )
+
+    _build_and_send_reports(today_matches)
 
 
-def run_noon_report() -> None:
-    """Build report (HTML with white bg, black font) and send via Telegram."""
-    rows = _read_rows()
-    rows = _prune_six_months(rows)
-
-    html_content = _build_noon_html(rows)
-    out = LOG_DIR / "momentum_noon_report.html"
-    with open(out, "w", encoding="utf-8") as f:
-        f.write(html_content)
-    print(f"Noon report saved to {out}")
-
-    if not rows:
-        print("No data in log. Sending empty-state report.")
-
-    _send_telegram_document(html_content, "momentum_log.html", "text/html")
-
-
-def run_backtest(start_date: str = "2026-01-01", send_csv: bool = False) -> None:
-    """Simulate daily scans from start_date to today; optionally send CSV via Telegram."""
-    start_d = datetime.strptime(start_date, "%Y-%m-%d").date()
-    today = datetime.now().date()
+def run_backtest(start_date: str = "2026-01-01") -> None:
+    """
+    Backtest: simulate daily scans from start_date to today (ET), writing to the same CSV.
+    This does NOT send reports; it only populates the log.
+    """
     config = load_config("config.yaml")
     quick = (os.getenv("MOMENTUM_QUICK_SAMPLE") or "").strip().lower() in ("1", "true", "yes")
     universe = _load_universe(config, quick_sample=quick)
 
+    start_d = datetime.strptime(start_date, "%Y-%m-%d").date()
+    today_d = datetime.now(ZoneInfo("America/New_York")).date()
+
     existing = _read_rows()
-    all_new = []
+    all_new: List[Dict] = []
+
     d = start_d
     day_count = 0
-
-    while d <= today:
+    while d <= today_d:
         day_count += 1
-        as_of = datetime(d.year, d.month, d.day, 12, 0, 0, tzinfo=ZoneInfo("America/New_York"))
-        print(f"\nBacktest day {day_count}: {d}...", flush=True)
+        as_of = datetime(d.year, d.month, d.day, 16, 0, 0, tzinfo=ZoneInfo("America/New_York"))
+        print(f"\nBacktest day {day_count}: {d} (as_of {as_of})", flush=True)
         for sym in universe:
             rec = _evaluate_symbol(sym, as_of=as_of)
             if rec:
                 all_new.append(rec)
-            time.sleep(0.05)
+            time.sleep(0.02)
         d += timedelta(days=1)
 
     all_rows = existing + all_new
     all_rows = _prune_six_months(all_rows)
     _write_rows(all_rows)
-    print(f"\nBacktest done. New rows: {len(all_new)}. Total: {len(all_rows)}. Log: {LOG_PATH}")
-
-    if send_csv:
-        html_content = _build_noon_html(all_rows)
-        _send_telegram_document(
-            html_content,
-            f"momentum_backtest_{start_date}_to_{today.strftime('%Y-%m-%d')}.html",
-            "text/html",
-            caption=f"Momentum backtest {start_date} to {today}",
-        )
+    print(
+        f"\nBacktest complete from {start_date} to {today_d}. "
+        f"New rows: {len(all_new)}. Total: {len(all_rows)}. Log: {LOG_PATH.resolve()}"
+    )
 
 
 if __name__ == "__main__":
     import argparse
     from dotenv import load_dotenv
+
     load_dotenv()
 
-    p = argparse.ArgumentParser(description="Momentum logger: 3-of-4 criteria (all same sign), log to CSV")
-    p.add_argument("--mode", choices=["daily", "noon", "backtest"], default="daily")
-    p.add_argument("--start", default="2026-01-01", help="Backtest start (YYYY-MM-DD)")
-    p.add_argument("--send", action="store_true", help="Send CSV via Telegram after backtest")
-    args = p.parse_args()
+    parser = argparse.ArgumentParser(
+        description=(
+            "Momentum logger: NYSE/NASDAQ, 3-of-4 criteria (all same sign), "
+            "volume >= $250M, 6-month log, HTML Telegram reports."
+        )
+    )
+    parser.add_argument("--mode", choices=["daily", "backtest"], default="daily")
+    parser.add_argument(
+        "--start", default="2026-01-01", help="Backtest start date (YYYY-MM-DD)"
+    )
+    args = parser.parse_args()
 
     if args.mode == "daily":
         run_daily_scan()
-    elif args.mode == "noon":
-        run_noon_report()
     else:
-        run_backtest(args.start, send_csv=args.send)
+        run_backtest(args.start)
+

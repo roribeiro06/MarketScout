@@ -3,7 +3,8 @@ name: MarketScout
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 20 * * *"   # 4:00pm ET -> daily scan + send report
+    # Weekdays at 4:00pm ET ≈ 20:00 UTC
+    - cron: "0 20 * * 1-5"
 
 jobs:
   run:
@@ -29,13 +30,6 @@ jobs:
           if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
             echo "::error::Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in repo Secrets."
             exit 1
-          fi
 
-      - name: Run momentum (4pm report or manual)
-        run: |
-          if [ "${{ github.event_name }}" = "schedule" ]; then
-            python momentum_logger.py --mode daily
-            python momentum_logger.py --mode noon
-          else
-            python momentum_logger.py --mode daily
-          fi
+      - name: Run momentum logger
+        run: python momentum_logger.py --mode daily
