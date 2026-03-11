@@ -3,8 +3,7 @@ name: MarketScout
 on:
   workflow_dispatch:
   schedule:
-    # Weekdays at 4:00pm ET ≈ 20:00 UTC
-    - cron: "0 20 * * 1-5"
+    - cron: "0 20 * * 1-5"   # 4pm ET weekdays (Mon-Fri)
 
 jobs:
   run:
@@ -30,6 +29,7 @@ jobs:
           if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
             echo "::error::Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in repo Secrets."
             exit 1
+          fi
 
-      - name: Run momentum logger
-        run: python momentum_logger.py --mode daily
+      - name: Run screener (scan + send Rising Stars & Big Ones)
+        run: python run_screener.py --mode scan
