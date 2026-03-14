@@ -366,6 +366,7 @@ def run_report_only(start_date: Optional[str] = None) -> None:
                     filtered.append(r)
             rows = filtered
 
+    rows = _dedupe_rows(rows)
     if not rows:
         print("No data in log. Run a scan or backtest first.")
         return
