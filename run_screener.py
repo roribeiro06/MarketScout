@@ -147,6 +147,15 @@ def _write_rows(rows: List[Dict]) -> None:
             w.writerows(rows)
 
 
+def _dedupe_rows(rows: List[Dict]) -> List[Dict]:
+    """Keep one row per (timestamp, symbol), preferring last occurrence."""
+    seen: Dict[Tuple[str, str], Dict] = {}
+    for r in rows:
+        key = (r.get("timestamp", ""), r.get("symbol", ""))
+        seen[key] = r
+    return list(seen.values())
+
+
 def _prune_six_months(rows: List[Dict]) -> List[Dict]:
     cutoff = datetime.now() - timedelta(days=180)
     kept = []
@@ -397,8 +406,9 @@ def run_backtest(start_date: str = "2026-01-01") -> None:
             time.sleep(0.05)
         d += timedelta(days=1)
 
-    all_rows = existing + all_new
+    all_rows = _dedupe_rows(existing + all_new)
     all_rows = _prune_six_months(all_rows)
+    all_rows.sort(key=lambda r: (r.get("timestamp", ""), r.get("symbol", "")))
     _write_rows(all_rows)
     print(f"\nBacktest done. New: {len(all_new)}. Total: {len(all_rows)}. Log: {LOG_PATH}")
 
