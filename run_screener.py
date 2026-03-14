@@ -147,13 +147,34 @@ def _write_rows(rows: List[Dict]) -> None:
             w.writerows(rows)
 
 
+def _date_from_ts(ts: str) -> str:
+    """Extract YYYY-MM-DD from timestamp string."""
+    return (ts or "")[:10]
+
+
 def _dedupe_rows(rows: List[Dict]) -> List[Dict]:
-    """Keep one row per (timestamp, symbol), preferring last occurrence."""
+    """Keep one row per (date, symbol), preferring backtest close (16:00) then latest."""
     seen: Dict[Tuple[str, str], Dict] = {}
     for r in rows:
-        key = (r.get("timestamp", ""), r.get("symbol", ""))
-        seen[key] = r
-    return list(seen.values())
+        ts = r.get("timestamp", "")
+        date_key = _date_from_ts(ts)
+        sym = r.get("symbol", "")
+        key = (date_key, sym)
+        existing = seen.get(key)
+        if not existing:
+            seen[key] = r
+        else:
+            # Prefer 16:00:00 (backtest EOD); else keep later timestamp
+            ex_ts = existing.get("timestamp", "")
+            if "16:00:00" in ts and "16:00:00" not in ex_ts:
+                seen[key] = r
+            elif "16:00:00" not in ts and "16:00:00" in ex_ts:
+                pass  # keep existing
+            elif ts > ex_ts:
+                seen[key] = r
+    out = list(seen.values())
+    out.sort(key=lambda r: (r.get("timestamp", ""), r.get("symbol", "")))
+    return out
 
 
 def _prune_six_months(rows: List[Dict]) -> List[Dict]:
@@ -326,7 +347,7 @@ def run_scan(as_of: Optional[datetime] = None, send_reports: bool = True) -> Non
             print(f"  Progress: {i + 1}/{len(universe)}", flush=True)
         time.sleep(0.08)
 
-    all_rows = existing + new_rows
+    all_rows = _dedupe_rows(existing + new_rows)
     all_rows = _prune_six_months(all_rows)
     _write_rows(all_rows)
     print(f"Appended {len(new_rows)}. Total (<=6mo): {len(all_rows)}. Log: {LOG_PATH}")
@@ -370,6 +391,9 @@ def run_report_only(start_date: Optional[str] = None) -> None:
     if not rows:
         print("No data in log. Run a scan or backtest first.")
         return
+    # Clean log file on disk (dedupe by date, prune) to prevent future duplicate display
+    full = _dedupe_rows(_prune_six_months(_read_rows()))
+    _write_rows(full)
     rising_html = _build_report_html(rows, "Rising Stars", config)
     big_html = _build_report_html(rows, "Big Ones", config)
     # Save locally
@@ -409,7 +433,6 @@ def run_backtest(start_date: str = "2026-01-01") -> None:
 
     all_rows = _dedupe_rows(existing + all_new)
     all_rows = _prune_six_months(all_rows)
-    all_rows.sort(key=lambda r: (r.get("timestamp", ""), r.get("symbol", "")))
     _write_rows(all_rows)
     print(f"\nBacktest done. New: {len(all_new)}. Total: {len(all_rows)}. Log: {LOG_PATH}")
 
