@@ -32,19 +32,8 @@ def _pct_change(series, days: int) -> Optional[float]:
     return (recent - past) / past * 100.0
 
 
-# Liquid symbols for quick backtest (set SCREENER_QUICK_SAMPLE=1)
-QUICK_SAMPLE_SYMBOLS = [
-    "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "BRK-B", "UNH", "JNJ",
-    "JPM", "V", "PG", "MA", "HD", "DIS", "BAC", "XOM", "CVX", "KO", "PEP", "COST",
-    "WMT", "MCD", "ABT", "NEE", "TMO", "AVGO", "ACN", "DHR", "NKE", "ORCL", "CRM",
-    "AMD", "INTC", "IBM", "GE", "CAT", "GS", "MS", "BA", "DOW", "HON", "UPS", "LOW",
-]
-
-
-def _load_universe(config: Dict, quick_sample: bool = False) -> List[str]:
-    if quick_sample:
-        print(f"  SCREENER_QUICK_SAMPLE: using {len(QUICK_SAMPLE_SYMBOLS)} symbols")
-        return list(QUICK_SAMPLE_SYMBOLS)
+def _load_universe(config: Dict) -> List[str]:
+    """Always use full NYSE + NASDAQ universe."""
     symbols = []
     for ex in config.get("exchanges", ["NYSE", "NASDAQ"]):
         symbols.extend(get_exchange_symbols(ex))
@@ -331,8 +320,7 @@ def _send_telegram_html(html: str, filename: str, caption: str) -> bool:
 
 def run_scan(as_of: Optional[datetime] = None, send_reports: bool = True) -> None:
     config = load_config("config.yaml")
-    quick = (os.getenv("SCREENER_QUICK_SAMPLE") or "").strip().lower() in ("1", "true", "yes")
-    universe = _load_universe(config, quick_sample=quick)
+    universe = _load_universe(config)
     now = as_of or datetime.now(ZoneInfo("America/New_York"))
     print(f"Scanning {len(universe)} symbols (3-of-4 same sign, $ vol > $250M)...")
 
@@ -407,8 +395,7 @@ def run_report_only(start_date: Optional[str] = None) -> None:
 
 def run_backtest(start_date: str = "2026-01-01") -> None:
     config = load_config("config.yaml")
-    quick = (os.getenv("SCREENER_QUICK_SAMPLE") or "").strip().lower() in ("1", "true", "yes")
-    universe = _load_universe(config, quick_sample=quick)
+    universe = _load_universe(config)
     start_d = datetime.strptime(start_date, "%Y-%m-%d").date()
     today = datetime.now(ZoneInfo("America/New_York")).date()
     existing = _read_rows()
