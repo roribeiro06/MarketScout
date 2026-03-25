@@ -1,6 +1,6 @@
 """
 MarketScout: Weekdays 4pm EST — scan stocks with daily $ vol > $250M,
-3-of-4 criteria (1D 3%, 7D 5%, 30D 15%, 90D 30%) same sign.
+all of 1D / 7D / 30D same sign vs thresholds (config); %90D in log/report only.
 Log 6 months. Send Rising Stars ($250M–$1B) and Big Ones (>= $1B) HTML reports to Telegram.
 """
 import csv
@@ -45,7 +45,7 @@ def _evaluate_symbol(
     config: Dict,
     as_of: Optional[datetime] = None,
 ) -> Optional[Dict]:
-    """Return log row if stock has $ vol > min and 3-of-4 same-sign criteria."""
+    """Return log row if stock has $ vol > min and 1D/7D/30D all meet same-sign thresholds."""
     try:
         t = yf.Ticker(symbol)
         hist = t.history(period="max", auto_adjust=False, interval="1d")
@@ -76,16 +76,16 @@ def _evaluate_symbol(
         d90 = _pct_change(close, 90)
         d1y = _pct_change(close, 252)
         d3y = _pct_change(close, 756)
-        if any(x is None for x in (d1, d7, d30, d90)):
+        if any(x is None for x in (d1, d7, d30)):
             return None
 
         th = config.get("thresholds", {})
-        t1, t7, t30, t90 = th.get("d1", 3), th.get("d7", 5), th.get("d30", 15), th.get("d90", 30)
-        pos = [d1 >= t1, d7 >= t7, d30 >= t30, d90 >= t90]
-        neg = [d1 <= -t1, d7 <= -t7, d30 <= -t30, d90 <= -t90]
-        if sum(pos) >= 3:
+        t1, t7, t30 = th.get("d1", 5), th.get("d7", 10), th.get("d30", 20)
+        pos = [d1 >= t1, d7 >= t7, d30 >= t30]
+        neg = [d1 <= -t1, d7 <= -t7, d30 <= -t30]
+        if all(pos):
             direction = "positive"
-        elif sum(neg) >= 3:
+        elif all(neg):
             direction = "negative"
         else:
             return None
@@ -108,7 +108,7 @@ def _evaluate_symbol(
             "pct_1d": f"{d1:.2f}",
             "pct_7d": f"{d7:.2f}",
             "pct_30d": f"{d30:.2f}",
-            "pct_90d": f"{d90:.2f}",
+            "pct_90d": f"{d90:.2f}" if d90 is not None else "",
             "pct_1y": f"{d1y:.2f}" if d1y is not None else "",
             "pct_3y": f"{d3y:.2f}" if d3y is not None else "",
             "direction": direction,
@@ -198,7 +198,7 @@ def _build_report_html(
     - Blank line
     - Header line: Name, (Ticker), Sector, price_now, (target_now), latest dollar volume
     - Then an HTML table with rows = log entries and columns = timestamp, price, target, dollar volume, %1D, %7D, %30D, %90D, %1Y.
-      Each data row is green when 3+ criteria are positive, red when 3+ are negative.
+      Each data row is green when direction is positive, red when negative (1D/7D/30D criteria).
     """
     min_dv = config.get("min_dollar_volume", 250_000_000)
     rising_max = config.get("rising_stars_max_dollar_volume", 1_000_000_000)
@@ -322,7 +322,7 @@ def run_scan(as_of: Optional[datetime] = None, send_reports: bool = True) -> Non
     config = load_config("config.yaml")
     universe = _load_universe(config)
     now = as_of or datetime.now(ZoneInfo("America/New_York"))
-    print(f"Scanning {len(universe)} symbols (3-of-4 same sign, $ vol > $250M)...")
+    print(f"Scanning {len(universe)} symbols (1D/7D/30D same sign vs thresholds, $ vol > $250M)...")
 
     existing = _read_rows()
     new_rows = []
@@ -330,7 +330,7 @@ def run_scan(as_of: Optional[datetime] = None, send_reports: bool = True) -> Non
         rec = _evaluate_symbol(sym, config, as_of=now)
         if rec:
             new_rows.append(rec)
-            print(f"  [MATCH] {sym}: {rec['direction']} — 1D {rec['pct_1d']}%, 7D {rec['pct_7d']}%, 30D {rec['pct_30d']}%, 90D {rec['pct_90d']}%")
+            print(f"  [MATCH] {sym}: {rec['direction']} — 1D {rec['pct_1d']}%, 7D {rec['pct_7d']}%, 30D {rec['pct_30d']}%, 90D {rec.get('pct_90d','')}%")
         if (i + 1) % 200 == 0:
             print(f"  Progress: {i + 1}/{len(universe)}", flush=True)
         time.sleep(0.08)
@@ -398,7 +398,16 @@ def run_backtest(start_date: str = "2026-01-01") -> None:
     universe = _load_universe(config)
     start_d = datetime.strptime(start_date, "%Y-%m-%d").date()
     today = datetime.now(ZoneInfo("America/New_York")).date()
-    existing = _read_rows()
+    # Drop log rows on/after start_date so reruns replace that window (new criteria, no stale dupes)
+    existing: List[Dict] = []
+    for r in _read_rows():
+        try:
+            rd = datetime.strptime(_date_from_ts(r.get("timestamp", "")), "%Y-%m-%d").date()
+        except Exception:
+            continue
+        if rd < start_d:
+            existing.append(r)
+    print(f"Backtest from {start_date}: keeping {len(existing)} log rows before that date; rebuilding {start_d} -> {today}...", flush=True)
     all_new = []
     d = start_d
     day_count = 0
