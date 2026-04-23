@@ -1,4 +1,4 @@
-# Screener: daily $ volume > $250M; 1D/7D/30D must all meet same-sign thresholds (%90D logged only, not used to qualify)
+# Screener: daily $ volume > $250M; min_matches of 1D/7D/30D same sign (%90D logged only, not used to qualify)
 min_dollar_volume: 250000000   # $250M
 rising_stars_max_dollar_volume: 1000000000  # $1B for Rising Stars (< 1B)
 big_ones_min_dollar_volume: 1000000000      # $1B for Big Ones (>= 1B)
@@ -7,6 +7,7 @@ thresholds:
   d1: 5.0
   d7: 10.0
   d30: 20.0
+  min_matches: 2   # of 3 horizons — 2-of-3 positive or 2-of-3 negative
 
 exchanges:
   - NYSE

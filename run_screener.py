@@ -1,13 +1,14 @@
 """
 MarketScout: Weekdays 4pm EST — scan stocks with daily $ vol > $250M,
-all of 1D / 7D / 30D same sign vs thresholds (config); %90D in log/report only.
+min_matches of 1D / 7D / 30D same sign vs thresholds (config, default 2-of-3); %90D in log/report only.
 Log 6 months. Send Rising Stars ($250M–$1B) and Big Ones (>= $1B) HTML reports to Telegram.
 """
 import csv
+import json
 import os
 import tempfile
 import time
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 from typing import Dict, List, Optional, Tuple
@@ -19,7 +20,55 @@ from screener.screener import get_exchange_symbols, load_config
 
 LOG_DIR = Path("logs")
 LOG_PATH = LOG_DIR / "screener_log.csv"
+BACKTEST_CHECKPOINT_PATH = LOG_DIR / "backtest_checkpoint.json"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _next_weekday_after(last: date) -> date:
+    d = last + timedelta(days=1)
+    while d.weekday() >= 5:
+        d += timedelta(days=1)
+    return d
+
+
+def _weekday_number_in_range(range_start: date, current: date) -> int:
+    """1-based index: current is the Nth weekday on/after range_start."""
+    n = 0
+    d = range_start
+    while d <= current:
+        if d.weekday() < 5:
+            n += 1
+        if d == current:
+            break
+        d += timedelta(days=1)
+    return n
+
+
+def _read_backtest_checkpoint() -> Optional[Dict]:
+    if not BACKTEST_CHECKPOINT_PATH.exists():
+        return None
+    try:
+        return json.loads(BACKTEST_CHECKPOINT_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def _write_backtest_checkpoint(last_completed: date, start_date: str) -> None:
+    BACKTEST_CHECKPOINT_PATH.write_text(
+        json.dumps(
+            {"last_completed": last_completed.isoformat(), "start_date": start_date},
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+
+def _clear_backtest_checkpoint() -> None:
+    try:
+        if BACKTEST_CHECKPOINT_PATH.exists():
+            BACKTEST_CHECKPOINT_PATH.unlink()
+    except Exception:
+        pass
 
 
 def _pct_change(series, days: int) -> Optional[float]:
@@ -45,7 +94,7 @@ def _evaluate_symbol(
     config: Dict,
     as_of: Optional[datetime] = None,
 ) -> Optional[Dict]:
-    """Return log row if stock has $ vol > min and 1D/7D/30D all meet same-sign thresholds."""
+    """Return log row if $ vol > min and min_matches of 1D/7D/30D meet same-sign thresholds."""
     try:
         t = yf.Ticker(symbol)
         hist = t.history(period="max", auto_adjust=False, interval="1d")
@@ -81,11 +130,16 @@ def _evaluate_symbol(
 
         th = config.get("thresholds", {})
         t1, t7, t30 = th.get("d1", 5), th.get("d7", 10), th.get("d30", 20)
+        min_matches = int(th.get("min_matches", 2))
+        min_matches = max(1, min(3, min_matches))
         pos = [d1 >= t1, d7 >= t7, d30 >= t30]
         neg = [d1 <= -t1, d7 <= -t7, d30 <= -t30]
-        if all(pos):
+        sp, sn = sum(pos), sum(neg)
+        if sp >= min_matches and sn >= min_matches:
+            return None
+        if sp >= min_matches:
             direction = "positive"
-        elif all(neg):
+        elif sn >= min_matches:
             direction = "negative"
         else:
             return None
@@ -322,7 +376,8 @@ def run_scan(as_of: Optional[datetime] = None, send_reports: bool = True) -> Non
     config = load_config("config.yaml")
     universe = _load_universe(config)
     now = as_of or datetime.now(ZoneInfo("America/New_York"))
-    print(f"Scanning {len(universe)} symbols (1D/7D/30D same sign vs thresholds, $ vol > $250M)...")
+    mm = int(config.get("thresholds", {}).get("min_matches", 2))
+    print(f"Scanning {len(universe)} symbols ({mm}-of-3 1D/7D/30D vs thresholds, $ vol > $250M)...")
 
     existing = _read_rows()
     new_rows = []
@@ -393,44 +448,83 @@ def run_report_only(start_date: Optional[str] = None) -> None:
     print("Reports sent to Telegram.")
 
 
-def run_backtest(start_date: str = "2026-01-01") -> None:
+def run_backtest(start_date: str = "2026-01-01", reset_log: bool = False, resume: bool = False) -> None:
+    """Backtest weekdays from start through today. Writes log + checkpoint after each completed day.
+
+    --reset-log: start with empty log and new checkpoint.
+    --resume: continue from last_completed in backtest_checkpoint.json (log rows preserved).
+    """
     config = load_config("config.yaml")
     universe = _load_universe(config)
     start_d = datetime.strptime(start_date, "%Y-%m-%d").date()
     today = datetime.now(ZoneInfo("America/New_York")).date()
-    # Drop log rows on/after start_date so reruns replace that window (new criteria, no stale dupes)
     existing: List[Dict] = []
-    for r in _read_rows():
-        try:
-            rd = datetime.strptime(_date_from_ts(r.get("timestamp", "")), "%Y-%m-%d").date()
-        except Exception:
-            continue
-        if rd < start_d:
-            existing.append(r)
-    print(f"Backtest from {start_date}: keeping {len(existing)} log rows before that date; rebuilding {start_d} -> {today}...", flush=True)
-    all_new = []
-    d = start_d
-    day_count = 0
+    range_start = start_d
+    all_new: List[Dict] = []
 
+    if reset_log:
+        _clear_backtest_checkpoint()
+        existing = []
+        d = start_d
+        print("Reset log: ignoring existing screener_log.csv rows for this backtest.", flush=True)
+    elif resume:
+        existing = _read_rows()
+        cp = _read_backtest_checkpoint()
+        if cp and cp.get("last_completed"):
+            last_done = datetime.strptime(cp["last_completed"], "%Y-%m-%d").date()
+            if cp.get("start_date"):
+                range_start = datetime.strptime(cp["start_date"], "%Y-%m-%d").date()
+            d = _next_weekday_after(last_done)
+            print(
+                f"Resume: last completed {last_done}; continuing from {d}. Log rows loaded: {len(existing)}.",
+                flush=True,
+            )
+        else:
+            d = start_d
+            print("Resume: no checkpoint; starting from --start date.", flush=True)
+    else:
+        existing = _read_rows()
+        d = start_d
+
+    if d > today:
+        print("Nothing to backtest (start is after today).")
+        return
+
+    total_weekdays = 0
+    sd = range_start
+    while sd <= today:
+        if sd.weekday() < 5:
+            total_weekdays += 1
+        sd += timedelta(days=1)
+
+    all_rows: List[Dict] = []
     while d <= today:
-        # Weekdays only
         if d.weekday() >= 5:
             d += timedelta(days=1)
             continue
-        day_count += 1
+        wd_i = _weekday_number_in_range(range_start, d)
         as_of = datetime(d.year, d.month, d.day, 16, 0, 0, tzinfo=ZoneInfo("America/New_York"))
-        print(f"\nBacktest day {day_count}: {d}...", flush=True)
+        print(f"\nBacktest weekday {wd_i}/{total_weekdays}: {d}...", flush=True)
+        day_rows: List[Dict] = []
         for sym in universe:
             rec = _evaluate_symbol(sym, config, as_of=as_of)
             if rec:
-                all_new.append(rec)
+                day_rows.append(rec)
             time.sleep(0.05)
+        all_new.extend(day_rows)
+
+        all_rows = _dedupe_rows(existing + all_new)
+        all_rows = _prune_six_months(all_rows)
+        _write_rows(all_rows)
+        _write_backtest_checkpoint(d, range_start.isoformat())
+        print(
+            f"  Checkpoint saved ({len(day_rows)} matches this day; {len(all_rows)} rows in log).",
+            flush=True,
+        )
         d += timedelta(days=1)
 
-    all_rows = _dedupe_rows(existing + all_new)
-    all_rows = _prune_six_months(all_rows)
-    _write_rows(all_rows)
-    print(f"\nBacktest done. New: {len(all_new)}. Total: {len(all_rows)}. Log: {LOG_PATH}")
+    _clear_backtest_checkpoint()
+    print(f"\nBacktest done. New rows this run: {len(all_new)}. Total in log: {len(all_rows)}. Log: {LOG_PATH}")
 
 
 if __name__ == "__main__":
@@ -442,6 +536,16 @@ if __name__ == "__main__":
     parser.add_argument("--mode", choices=["scan", "backtest", "report"], default="scan")
     parser.add_argument("--start", default="2026-01-01", help="Backtest start YYYY-MM-DD")
     parser.add_argument("--no-send", action="store_true", help="Do not send reports to Telegram after scan")
+    parser.add_argument(
+        "--reset-log",
+        action="store_true",
+        help="Backtest only: do not merge existing log; write fresh results from backtest",
+    )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Backtest only: continue from logs/backtest_checkpoint.json after a stop/crash",
+    )
     args = parser.parse_args()
 
     if args.mode == "scan":
@@ -449,4 +553,4 @@ if __name__ == "__main__":
     elif args.mode == "report":
         run_report_only(start_date=args.start)
     else:
-        run_backtest(args.start)
+        run_backtest(args.start, reset_log=args.reset_log, resume=args.resume)
